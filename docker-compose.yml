@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  download-api:
+    build:
+      context: ./src/DownloadApi
+      dockerfile: Dockerfile
+      args:
+        YTDLP_VERSION: 2025.03.10
+    container_name: mgrabber-download-api
+    # NO port mapping - internal only
+    expose:
+      - "8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - API_KEY=${API_KEY:-default-dev-key-change-in-production}
+    volumes:
+      - storage:/storage
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend will be added in Phase 2
+  # frontend:
+  #   build: ./src/Frontend
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - DOWNLOAD_API_KEY=${API_KEY}
+  #     - DOWNLOAD_API_URL=http://download-api:8080
+  #   networks:
+  #     - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  storage:
+    driver: local
