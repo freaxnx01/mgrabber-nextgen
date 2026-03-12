@@ -10,16 +10,15 @@ RUN dotnet restore
 COPY . .
 RUN dotnet publish -c Release -o /app/publish
 
-# Runtime stage with Alpine + ffmpeg
+# Runtime stage with Alpine + ffmpeg + Python for yt-dlp
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview-alpine AS runtime
 WORKDIR /app
 
-# Install ffmpeg
-RUN apk add --no-cache ffmpeg
+# Install ffmpeg and Python (yt-dlp needs Python)
+RUN apk add --no-cache ffmpeg python3 py3-pip
 
-# Install yt-dlp (latest stable)
-RUN wget -O /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux && \
-    chmod +x /usr/local/bin/yt-dlp
+# Install yt-dlp via pip (more reliable on Alpine)
+RUN pip3 install --break-system-packages yt-dlp
 
 # Create storage directory
 RUN mkdir -p /storage

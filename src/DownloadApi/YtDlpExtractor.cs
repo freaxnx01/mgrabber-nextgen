@@ -5,7 +5,7 @@ namespace DownloadApi;
 public class YtDlpExtractor : IAudioExtractor
 {
     private readonly ILogger<YtDlpExtractor> _logger;
-    private readonly string _ytDlpPath = "/usr/local/bin/yt-dlp";
+    private readonly string _ytDlpPath = "yt-dlp";
     private readonly string _storagePath = "/storage";
 
     public YtDlpExtractor(ILogger<YtDlpExtractor> logger)
