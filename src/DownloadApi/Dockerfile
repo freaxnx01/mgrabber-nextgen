@@ -17,9 +17,8 @@ WORKDIR /app
 # Install ffmpeg
 RUN apk add --no-cache ffmpeg
 
-# Install yt-dlp (pinned version)
-ARG YTDLP_VERSION=2025.03.10
-RUN wget -O /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp_linux && \
+# Install yt-dlp (latest stable)
+RUN wget -O /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux && \
     chmod +x /usr/local/bin/yt-dlp
 
 # Create storage directory

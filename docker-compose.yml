@@ -5,8 +5,6 @@ services:
     build:
       context: ./src/DownloadApi
       dockerfile: Dockerfile
-      args:
-        YTDLP_VERSION: 2025.03.10
     container_name: mgrabber-download-api
     # NO port mapping - internal only
     expose:
