@@ -17,11 +17,6 @@ public class YtDlpExtractor : IAudioExtractor
     {
         try
         {
-            if (!File.Exists(_ytDlpPath))
-            {
-                return "yt-dlp not found";
-            }
-
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
