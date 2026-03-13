@@ -200,6 +200,103 @@ app.MapGet("/api/jobs/{userId}", async (string userId, JobRepository repo) =>
     }));
 });
 
+// ========== File Management ==========
+
+// List user's downloaded files
+app.MapGet("/api/files/{userId}", async (string userId, JobRepository repo) =>
+{
+    var jobs = await repo.GetUserJobsAsync(userId);
+    var files = jobs
+        .Where(j => j.Status == JobStatus.Completed && !string.IsNullOrEmpty(j.FilePath))
+        .Select(j => new
+        {
+            j.Id,
+            j.Title,
+            j.Author,
+            j.Format,
+            FileSizeBytes = j.FileSizeBytes,
+            FileSizeMB = Math.Round(j.FileSizeBytes / (1024.0 * 1024.0), 2),
+            j.CreatedAt,
+            j.FilePath
+        });
+    
+    return Results.Ok(files);
+});
+
+// Download a file
+app.MapGet("/api/files/{userId}/download/{jobId}", async (string userId, string jobId, JobRepository repo) =>
+{
+    var job = await repo.GetJobAsync(jobId);
+    
+    if (job == null)
+        return Results.NotFound(new { Error = "Job not found" });
+    
+    if (job.UserId != userId)
+        return Results.Forbid();
+    
+    if (job.Status != JobStatus.Completed || string.IsNullOrEmpty(job.FilePath))
+        return Results.BadRequest(new { Error = "File not available for download" });
+    
+    if (!File.Exists(job.FilePath))
+        return Results.NotFound(new { Error = "File not found on disk" });
+    
+    var fileName = Path.GetFileName(job.FilePath);
+    var mimeType = job.Format?.ToLower() switch
+    {
+        "mp3" => "audio/mpeg",
+        "flac" => "audio/flac",
+        "m4a" => "audio/mp4",
+        _ => "application/octet-stream"
+    };
+    
+    return Results.File(job.FilePath, mimeType, fileName);
+});
+
+// Delete a file
+app.MapDelete("/api/files/{userId}/{jobId}", async (string userId, string jobId, JobRepository repo) =>
+{
+    var job = await repo.GetJobAsync(jobId);
+    
+    if (job == null)
+        return Results.NotFound(new { Error = "Job not found" });
+    
+    if (job.UserId != userId)
+        return Results.Forbid();
+    
+    // Delete file from disk if exists
+    if (!string.IsNullOrEmpty(job.FilePath) && File.Exists(job.FilePath))
+    {
+        try
+        {
+            File.Delete(job.FilePath);
+            
+            // Try to remove empty parent directories
+            var dir = Path.GetDirectoryName(job.FilePath);
+            if (dir != null && Directory.Exists(dir) && !Directory.EnumerateFileSystemEntries(dir).Any())
+            {
+                Directory.Delete(dir);
+                
+                // Try to remove user directory if empty
+                var userDir = Path.GetDirectoryName(dir);
+                if (userDir != null && Directory.Exists(userDir) && !Directory.EnumerateFileSystemEntries(userDir).Any())
+                {
+                    Directory.Delete(userDir);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail - DB record will still be deleted
+            Console.WriteLine($"Warning: Could not delete file {job.FilePath}: {ex.Message}");
+        }
+    }
+    
+    // Delete from database
+    await repo.DeleteJobAsync(jobId);
+    
+    return Results.Ok(new { Message = "File deleted successfully" });
+});
+
 // Background download processor with retry logic
 async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtractor extractor)
 {

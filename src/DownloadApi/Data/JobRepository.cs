@@ -169,6 +169,18 @@ public class JobRepository
         await cmd.ExecuteNonQueryAsync();
     }
 
+    public async Task DeleteJobAsync(string jobId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM DownloadJobs WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", jobId);
+
+        await cmd.ExecuteNonQueryAsync();
+    }
+
     private DownloadJob MapJob(SqliteDataReader reader)
     {
         return new DownloadJob
