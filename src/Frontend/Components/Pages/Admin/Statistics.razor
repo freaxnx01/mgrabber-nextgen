@@ -1,6 +1,9 @@
 @page "/admin/statistics"
 @using Frontend.Services
 @using Microsoft.AspNetCore.Authorization
+@using GlobalStatsDto = Frontend.Services.GlobalStatsDto
+@using UserStatsDto = Frontend.Services.UserStatsDto
+@using UserDetailStatsDto = Frontend.Services.UserDetailStatsDto
 @inject DownloadApiService DownloadApi
 @inject ILogger<Statistics> Logger
 @rendermode InteractiveServer
@@ -288,43 +291,4 @@
         "pending" => "bg-warning text-dark",
         _ => "bg-secondary"
     };
-
-    // DTOs
-    public class GlobalStatsDto
-    {
-        public int TotalDownloads { get; set; }
-        public long TotalStorageBytes { get; set; }
-        public double TotalStorageMB { get; set; }
-        public List<DailyDownloadCountDto> DownloadsPerDay { get; set; } = new();
-        public Dictionary<string, int> StatusCounts { get; set; } = new();
-        public int ActiveUsersLast7Days { get; set; }
-    }
-
-    public class DailyDownloadCountDto
-    {
-        public string Date { get; set; } = "";
-        public int Count { get; set; }
-    }
-
-    public class UserStatsDto
-    {
-        public string UserId { get; set; } = "";
-        public int TotalDownloads { get; set; }
-        public double TotalStorageMB { get; set; }
-        public int CompletedDownloads { get; set; }
-        public int FailedDownloads { get; set; }
-        public DateTime? LastActive { get; set; }
-    }
-
-    public class UserDetailStatsDto : UserStatsDto
-    {
-        public List<ArtistCountDto> TopArtists { get; set; } = new();
-        public List<DailyDownloadCountDto> DownloadsPerDay { get; set; } = new();
-    }
-
-    public class ArtistCountDto
-    {
-        public string Artist { get; set; } = "";
-        public int Count { get; set; }
-    }
 }
