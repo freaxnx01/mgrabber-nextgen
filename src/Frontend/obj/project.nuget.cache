@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "dgSpecHash": "xnsNbAXeDZc=",
+  "success": true,
+  "projectFilePath": "/home/ubuntu/.openclaw/workspace/mgrabber-nextgen/src/Frontend/Frontend.csproj",
+  "expectedPackageFiles": [
+    "/home/ubuntu/.nuget/packages/microsoft.aspnetcore.app.internal.assets/10.0.0-preview.3.25172.1/microsoft.aspnetcore.app.internal.assets.10.0.0-preview.3.25172.1.nupkg.sha512"
+  ],
+  "logs": [
+    {
+      "code": "NU1603",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Frontend hängt von Microsoft.AspNetCore.App.Internal.Assets (>= 10.0.0-preview.3.25120.10) ab, aber Microsoft.AspNetCore.App.Internal.Assets 10.0.0-preview.3.25120.10 wurde nicht gefunden. Microsoft.AspNetCore.App.Internal.Assets 10.0.0-preview.3.25172.1 wurde stattdessen aufgelöst.",
+      "libraryId": "Microsoft.AspNetCore.App.Internal.Assets",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
+}

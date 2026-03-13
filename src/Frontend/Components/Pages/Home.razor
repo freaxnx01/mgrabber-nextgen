@@ -1,0 +1,213 @@
+@page "/"
+@using Frontend.Services
+@inject DownloadApiService DownloadApi
+@inject ILogger<Home> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Music Downloader</PageTitle>
+
+<div class="container">
+    <h1>🎵 Music Downloader</h1>
+    <p class="text-muted">Search and download music from YouTube</p>
+
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="alert @MessageClass" role="alert">
+            @Message
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Search YouTube</h5>
+        </div>
+        <div class="card-body">
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" @bind="SearchQuery" placeholder="Search for songs, artists..." @bind:event="oninput" />
+                <button class="btn btn-primary" @onclick="SearchAsync" disabled="@IsSearching">
+                    @if (IsSearching)
+                    {
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        <span class="visually-hidden">Loading...</span>
+                    }
+                    else
+                    {
+                        <span>Search</span>
+                    }
+                </button>
+            </div>
+
+            @if (SearchResults?.Results?.Any() == true)
+            {
+                <div class="list-group">
+                    @foreach (var video in SearchResults.Results)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">@video.Title</h6>
+                                <small class="text-muted">@video.Author • @video.Duration</small>
+                            </div>
+                            <button class="btn btn-success btn-sm" @onclick="() => DownloadAsync(video)">
+                                Download
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5>Your Downloads</h5>
+        </div>
+        <div class="card-body">
+            @if (UserFiles?.Any() == true)
+            {
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Artist</th>
+                            <th>Size</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var file in UserFiles)
+                        {
+                            <tr>
+                                <td>@file.Title</td>
+                                <td>@file.Author</td>
+                                <td>@file.FileSizeMB MB</td>
+                                <td>
+                                    <span class="badge bg-success">Available</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => DeleteAsync(file.Id)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted">No downloads yet. Search and download some music!</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string SearchQuery { get; set; } = "";
+    private bool IsSearching { get; set; }
+    private YouTubeSearchResult? SearchResults { get; set; }
+    private List<FileItem>? UserFiles { get; set; }
+    private string? Message { get; set; }
+    private string MessageClass { get; set; } = "alert-info";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserFilesAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+            return;
+
+        IsSearching = true;
+        Message = null;
+
+        try
+        {
+            SearchResults = await DownloadApi.SearchYouTubeAsync(SearchQuery);
+            if (SearchResults?.Results?.Any() != true)
+            {
+                Message = "No results found.";
+                MessageClass = "alert-warning";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Search failed");
+            Message = "Search failed. Please try again.";
+            MessageClass = "alert-danger";
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    private async Task DownloadAsync(YouTubeVideo video)
+    {
+        Message = $"Starting download: {video.Title}...";
+        MessageClass = "alert-info";
+
+        try
+        {
+            var result = await DownloadApi.StartDownloadAsync(
+                $"https://youtube.com/watch?v={video.VideoId}",
+                video.Title,
+                video.Author);
+
+            if (result != null)
+            {
+                Message = $"Download started! Job ID: {result.JobId}";
+                MessageClass = "alert-success";
+                await LoadUserFilesAsync();
+            }
+            else
+            {
+                Message = "Failed to start download.";
+                MessageClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Download failed");
+            Message = "Download failed. Please try again.";
+            MessageClass = "alert-danger";
+        }
+    }
+
+    private async Task LoadUserFilesAsync()
+    {
+        try
+        {
+            UserFiles = await DownloadApi.GetUserFilesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load user files");
+        }
+    }
+
+    private async Task DeleteAsync(string jobId)
+    {
+        try
+        {
+            var success = await DownloadApi.DeleteFileAsync(jobId);
+            if (success)
+            {
+                Message = "File deleted successfully.";
+                MessageClass = "alert-success";
+                await LoadUserFilesAsync();
+            }
+            else
+            {
+                Message = "Failed to delete file.";
+                MessageClass = "alert-danger";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Delete failed");
+            Message = "Delete failed. Please try again.";
+            MessageClass = "alert-danger";
+        }
+    }
+}
