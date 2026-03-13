@@ -3,6 +3,7 @@ namespace DownloadApi;
 public interface IAudioExtractor
 {
     Task<ExtractionResult> ExtractAsync(string url, AudioFormat format, CancellationToken ct);
+    Task<ExtractionResult> ExtractAsync(string url, AudioFormat format, string? userId, string? jobId, string? author, string? title, CancellationToken ct);
     Task<VideoInfo> GetInfoAsync(string url, CancellationToken ct);
     Task<string> GetVersionAsync();
 }

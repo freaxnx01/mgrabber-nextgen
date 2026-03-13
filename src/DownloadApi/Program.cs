@@ -215,8 +215,15 @@ async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtracto
             // Update status to downloading
             await repo.UpdateJobStatusAsync(jobId, JobStatus.Downloading, 10);
 
-            // Perform extraction
-            var result = await extractor.ExtractAsync(job.Url, AudioFormat.Mp3, CancellationToken.None);
+            // Perform extraction with custom filename
+            var result = await extractor.ExtractAsync(
+                job.Url, 
+                AudioFormat.Mp3, 
+                job.UserId,
+                job.Id,
+                job.Author,
+                job.Title,
+                CancellationToken.None);
 
             if (result.Success && !string.IsNullOrEmpty(result.FilePath))
             {
