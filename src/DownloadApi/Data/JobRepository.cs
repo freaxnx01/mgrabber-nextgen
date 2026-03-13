@@ -181,6 +181,197 @@ public class JobRepository
         await cmd.ExecuteNonQueryAsync();
     }
 
+    // ========== Admin Statistics ==========
+
+    public async Task<GlobalStats> GetGlobalStatsAsync()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var stats = new GlobalStats();
+
+        // Total downloads
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*), COALESCE(SUM(FileSizeBytes), 0) FROM DownloadJobs WHERE Status = 'Completed'";
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            if (await reader.ReadAsync())
+            {
+                stats.TotalDownloads = reader.GetInt32(0);
+                stats.TotalStorageBytes = reader.GetInt64(1);
+            }
+        }
+
+        // Downloads per day (last 30 days)
+        cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT date(CreatedAt) as Day, COUNT(*) 
+            FROM DownloadJobs 
+            WHERE Status = 'Completed' AND CreatedAt > datetime('now', '-30 days')
+            GROUP BY date(CreatedAt)
+            ORDER BY Day";
+        stats.DownloadsPerDay = new List<DailyDownloadCount>();
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                stats.DownloadsPerDay.Add(new DailyDownloadCount
+                {
+                    Date = reader.GetString(0),
+                    Count = reader.GetInt32(1)
+                });
+            }
+        }
+
+        // Success/failure rate
+        cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT Status, COUNT(*) 
+            FROM DownloadJobs 
+            GROUP BY Status";
+        stats.StatusCounts = new Dictionary<string, int>();
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                stats.StatusCounts[reader.GetString(0)] = reader.GetInt32(1);
+            }
+        }
+
+        // Active users (unique users in last 7 days)
+        cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT COUNT(DISTINCT UserId) 
+            FROM DownloadJobs 
+            WHERE CreatedAt > datetime('now', '-7 days')";
+        stats.ActiveUsersLast7Days = Convert.ToInt32(await cmd.ExecuteScalarAsync());
+
+        return stats;
+    }
+
+    public async Task<List<UserStats>> GetUserStatsAsync()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT 
+                UserId,
+                COUNT(*) as TotalDownloads,
+                COALESCE(SUM(FileSizeBytes), 0) as TotalStorage,
+                COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as CompletedDownloads,
+                COUNT(CASE WHEN Status = 'Failed' THEN 1 END) as FailedDownloads,
+                MAX(CreatedAt) as LastActive
+            FROM DownloadJobs
+            GROUP BY UserId
+            ORDER BY TotalDownloads DESC";
+
+        var userStats = new List<UserStats>();
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                userStats.Add(new UserStats
+                {
+                    UserId = reader.GetString(0),
+                    TotalDownloads = reader.GetInt32(1),
+                    TotalStorageBytes = reader.GetInt64(2),
+                    CompletedDownloads = reader.GetInt32(3),
+                    FailedDownloads = reader.GetInt32(4),
+                    LastActive = reader.IsDBNull(5) ? null : DateTime.Parse(reader.GetString(5))
+                });
+            }
+        }
+
+        return userStats;
+    }
+
+    public async Task<UserDetailStats?> GetUserDetailStatsAsync(string userId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var stats = new UserDetailStats { UserId = userId };
+
+        // Overall stats
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT 
+                COUNT(*),
+                COALESCE(SUM(FileSizeBytes), 0),
+                COUNT(CASE WHEN Status = 'Completed' THEN 1 END),
+                COUNT(CASE WHEN Status = 'Failed' THEN 1 END),
+                MAX(CreatedAt)
+            FROM DownloadJobs
+            WHERE UserId = @userId";
+        cmd.Parameters.AddWithValue("@userId", userId);
+
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            if (await reader.ReadAsync())
+            {
+                stats.TotalDownloads = reader.GetInt32(0);
+                stats.TotalStorageBytes = reader.GetInt64(1);
+                stats.CompletedDownloads = reader.GetInt32(2);
+                stats.FailedDownloads = reader.GetInt32(3);
+                stats.LastActive = reader.IsDBNull(4) ? null : DateTime.Parse(reader.GetString(4));
+            }
+        }
+
+        if (stats.TotalDownloads == 0)
+            return null;
+
+        // Top artists
+        cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT Author, COUNT(*) as Count
+            FROM DownloadJobs
+            WHERE UserId = @userId AND Author IS NOT NULL
+            GROUP BY Author
+            ORDER BY Count DESC
+            LIMIT 10";
+        cmd.Parameters.AddWithValue("@userId", userId);
+
+        stats.TopArtists = new List<ArtistCount>();
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                stats.TopArtists.Add(new ArtistCount
+                {
+                    Artist = reader.GetString(0),
+                    Count = reader.GetInt32(1)
+                });
+            }
+        }
+
+        // Downloads per day (last 30 days)
+        cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT date(CreatedAt) as Day, COUNT(*)
+            FROM DownloadJobs
+            WHERE UserId = @userId AND CreatedAt > datetime('now', '-30 days')
+            GROUP BY date(CreatedAt)
+            ORDER BY Day";
+        cmd.Parameters.AddWithValue("@userId", userId);
+
+        stats.DownloadsPerDay = new List<DailyDownloadCount>();
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                stats.DownloadsPerDay.Add(new DailyDownloadCount
+                {
+                    Date = reader.GetString(0),
+                    Count = reader.GetInt32(1)
+                });
+            }
+        }
+
+        return stats;
+    }
+
     private DownloadJob MapJob(SqliteDataReader reader)
     {
         return new DownloadJob
@@ -229,4 +420,44 @@ public enum JobStatus
     Downloading,
     Completed,
     Failed
+}
+
+// Statistics DTOs
+public class GlobalStats
+{
+    public int TotalDownloads { get; set; }
+    public long TotalStorageBytes { get; set; }
+    public double TotalStorageMB => TotalStorageBytes / (1024.0 * 1024.0);
+    public List<DailyDownloadCount> DownloadsPerDay { get; set; } = new();
+    public Dictionary<string, int> StatusCounts { get; set; } = new();
+    public int ActiveUsersLast7Days { get; set; }
+}
+
+public class DailyDownloadCount
+{
+    public string Date { get; set; } = "";
+    public int Count { get; set; }
+}
+
+public class UserStats
+{
+    public string UserId { get; set; } = "";
+    public int TotalDownloads { get; set; }
+    public long TotalStorageBytes { get; set; }
+    public double TotalStorageMB => TotalStorageBytes / (1024.0 * 1024.0);
+    public int CompletedDownloads { get; set; }
+    public int FailedDownloads { get; set; }
+    public DateTime? LastActive { get; set; }
+}
+
+public class UserDetailStats : UserStats
+{
+    public List<ArtistCount> TopArtists { get; set; } = new();
+    public List<DailyDownloadCount> DownloadsPerDay { get; set; } = new();
+}
+
+public class ArtistCount
+{
+    public string Artist { get; set; } = "";
+    public int Count { get; set; }
 }

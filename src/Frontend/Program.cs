@@ -19,9 +19,9 @@ builder.Services.AddAuthentication(options =>
 {
     // Configure dev user from appsettings or defaults
     var devAuthConfig = builder.Configuration.GetSection("DevAuth");
-    options.Email = devAuthConfig["Email"] ?? "dev@test.local";
-    options.Name = devAuthConfig["Name"] ?? "Dev User";
-    options.Role = devAuthConfig["Role"] ?? "User";
+    options.Email = devAuthConfig["Email"] ?? "admin@test.local";
+    options.Name = devAuthConfig["Name"] ?? "Admin User";
+    options.Role = devAuthConfig["Role"] ?? "Admin";  // Default to Admin for testing
 });
 
 builder.Services.AddAuthorization();

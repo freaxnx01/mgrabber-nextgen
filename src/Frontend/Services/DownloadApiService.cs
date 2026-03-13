@@ -127,6 +127,53 @@ public class DownloadApiService
             return false;
         }
     }
+
+    // ========== Admin Methods ==========
+
+    public async Task<GlobalStatsDto?> GetGlobalStatsAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("/api/admin/stats/global");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<GlobalStatsDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get global stats");
+            return null;
+        }
+    }
+
+    public async Task<List<UserStatsDto>?> GetAllUserStatsAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("/api/admin/stats/users");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<List<UserStatsDto>>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get user stats");
+            return null;
+        }
+    }
+
+    public async Task<UserDetailStatsDto?> GetUserDetailStatsAsync(string userId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/admin/stats/users/{userId}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<UserDetailStatsDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get user detail stats");
+            return null;
+        }
+    }
 }
 
 // DTOs
@@ -190,4 +237,43 @@ public class FileItem
     public string Format { get; set; } = "";
     public double FileSizeMB { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+// Admin DTOs
+public class GlobalStatsDto
+{
+    public int TotalDownloads { get; set; }
+    public long TotalStorageBytes { get; set; }
+    public double TotalStorageMB { get; set; }
+    public List<DailyDownloadCountDto> DownloadsPerDay { get; set; } = new();
+    public Dictionary<string, int> StatusCounts { get; set; } = new();
+    public int ActiveUsersLast7Days { get; set; }
+}
+
+public class DailyDownloadCountDto
+{
+    public string Date { get; set; } = "";
+    public int Count { get; set; }
+}
+
+public class UserStatsDto
+{
+    public string UserId { get; set; } = "";
+    public int TotalDownloads { get; set; }
+    public double TotalStorageMB { get; set; }
+    public int CompletedDownloads { get; set; }
+    public int FailedDownloads { get; set; }
+    public DateTime? LastActive { get; set; }
+}
+
+public class UserDetailStatsDto : UserStatsDto
+{
+    public List<ArtistCountDto> TopArtists { get; set; } = new();
+    public List<DailyDownloadCountDto> DownloadsPerDay { get; set; } = new();
+}
+
+public class ArtistCountDto
+{
+    public string Artist { get; set; } = "";
+    public int Count { get; set; }
 }

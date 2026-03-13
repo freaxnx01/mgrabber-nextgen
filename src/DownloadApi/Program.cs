@@ -252,6 +252,58 @@ app.MapGet("/api/files/{userId}/download/{jobId}", async (string userId, string 
     return Results.File(job.FilePath, mimeType, fileName);
 });
 
+// ========== Admin Statistics ==========
+
+// Get global stats (admin only)
+app.MapGet("/api/admin/stats/global", async (JobRepository repo) =>
+{
+    var stats = await repo.GetGlobalStatsAsync();
+    return Results.Ok(new
+    {
+        stats.TotalDownloads,
+        stats.TotalStorageBytes,
+        TotalStorageMB = Math.Round(stats.TotalStorageMB, 2),
+        stats.DownloadsPerDay,
+        stats.StatusCounts,
+        stats.ActiveUsersLast7Days
+    });
+});
+
+// Get all user stats (admin only)
+app.MapGet("/api/admin/stats/users", async (JobRepository repo) =>
+{
+    var users = await repo.GetUserStatsAsync();
+    return Results.Ok(users.Select(u => new
+    {
+        u.UserId,
+        u.TotalDownloads,
+        TotalStorageMB = Math.Round(u.TotalStorageMB, 2),
+        u.CompletedDownloads,
+        u.FailedDownloads,
+        u.LastActive
+    }));
+});
+
+// Get specific user stats (admin only)
+app.MapGet("/api/admin/stats/users/{userId}", async (string userId, JobRepository repo) =>
+{
+    var stats = await repo.GetUserDetailStatsAsync(userId);
+    if (stats == null)
+        return Results.NotFound(new { Error = "User not found" });
+    
+    return Results.Ok(new
+    {
+        stats.UserId,
+        stats.TotalDownloads,
+        TotalStorageMB = Math.Round(stats.TotalStorageMB, 2),
+        stats.CompletedDownloads,
+        stats.FailedDownloads,
+        stats.LastActive,
+        stats.TopArtists,
+        stats.DownloadsPerDay
+    });
+});
+
 // Delete a file
 app.MapDelete("/api/files/{userId}/{jobId}", async (string userId, string jobId, JobRepository repo) =>
 {

@@ -1,0 +1,329 @@
+@page "/admin/statistics"
+@using Frontend.Services
+@inject DownloadApiService DownloadApi
+@inject ILogger<Statistics> Logger
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+
+<PageTitle>Admin Statistics</PageTitle>
+
+<div class="container">
+    <h1>📊 Admin Statistics</h1>
+    <p class="text-muted">Overview of system usage and download statistics</p>
+
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="alert @MessageClass" role="alert">
+            @Message
+        </div>
+    }
+
+    @if (GlobalStats != null)
+    {
+        <!-- Global Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Downloads</h5>
+                        <h2>@GlobalStats.TotalDownloads</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Storage Used</h5>
+                        <h2>@GlobalStats.TotalStorageMB.ToString("F1") MB</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body">
+                        <h5 class="card-title">Active Users (7d)</h5>
+                        <h2>@GlobalStats.ActiveUsersLast7Days</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body">
+                        <h5 class="card-title">Success Rate</h5>
+                        <h2>@GetSuccessRate()%</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Distribution -->
+        @if (GlobalStats.StatusCounts?.Any() == true)
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Download Status Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        @foreach (var status in GlobalStats.StatusCounts)
+                        {
+                            <div class="col-md-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="badge @GetStatusBadgeClass(status.Key)">@status.Key</span>
+                                    <span class="fw-bold">@status.Value</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Downloads Per Day Chart -->
+        @if (GlobalStats.DownloadsPerDay?.Any() == true)
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Downloads Per Day (Last 30 Days)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Downloads</th>
+                                    <th>Bar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var day in GlobalStats.DownloadsPerDay.OrderByDescending(d => d.Date))
+                                {
+                                    var percentage = MaxDownloadsPerDay > 0 ? (day.Count * 100 / MaxDownloadsPerDay) : 0;
+                                    <tr>
+                                        <td>@day.Date</td>
+                                        <td>@day.Count</td>
+                                        <td style="width: 50%;">
+                                            <div class="progress">
+                                                <div class="progress-bar" role="progressbar" style="width: @percentage%"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+
+    <!-- User Statistics -->
+    @if (UserStats?.Any() == true)
+    {
+        <div class="card">
+            <div class="card-header">
+                <h5>User Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Total Downloads</th>
+                                <th>Storage Used</th>
+                                <th>Completed</th>
+                                <th>Failed</th>
+                                <th>Last Active</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in UserStats)
+                            {
+                                <tr>
+                                    <td><code>@user.UserId.Substring(0, Math.Min(8, user.UserId.Length))...</code></td>
+                                    <td>@user.TotalDownloads</td>
+                                    <td>@user.TotalStorageMB.ToString("F1") MB</td>
+                                    <td class="text-success">@user.CompletedDownloads</td>
+                                    <td class="text-danger">@user.FailedDownloads</td>
+                                    <td>@user.LastActive?.ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" @onclick="() => ShowUserDetails(user.UserId)">Details</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- User Detail Modal -->
+    @if (SelectedUserStats != null)
+    {
+        <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">User Details: @SelectedUserStats.UserId</h5>
+                        <button type="button" class="btn-close" @onclick="() => SelectedUserStats = null"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h6>Total Downloads</h6>
+                                        <h3>@SelectedUserStats.TotalDownloads</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h6>Storage Used</h6>
+                                        <h3>@SelectedUserStats.TotalStorageMB.ToString("F1") MB</h3>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h6>Success Rate</h6>
+                                        <h3>@GetUserSuccessRate(SelectedUserStats)%</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (SelectedUserStats.TopArtists?.Any() == true)
+                        {
+                            <h6>Top Artists</h6>
+                            <div class="list-group mb-3">
+                                @foreach (var artist in SelectedUserStats.TopArtists.Take(5))
+                                {
+                                    <div class="list-group-item d-flex justify-content-between">
+                                        <span>@artist.Artist</span>
+                                        <span class="badge bg-primary">@artist.Count downloads</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="() => SelectedUserStats = null">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private GlobalStatsDto? GlobalStats { get; set; }
+    private List<UserStatsDto>? UserStats { get; set; }
+    private UserDetailStatsDto? SelectedUserStats { get; set; }
+    private string? Message { get; set; }
+    private string MessageClass { get; set; } = "alert-info";
+
+    private int MaxDownloadsPerDay => GlobalStats?.DownloadsPerDay?.Max(d => d.Count) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatsAsync();
+    }
+
+    private async Task LoadStatsAsync()
+    {
+        try
+        {
+            GlobalStats = await DownloadApi.GetGlobalStatsAsync();
+            UserStats = await DownloadApi.GetAllUserStatsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load statistics");
+            Message = "Failed to load statistics. Please try again.";
+            MessageClass = "alert-danger";
+        }
+    }
+
+    private async Task ShowUserDetails(string userId)
+    {
+        try
+        {
+            SelectedUserStats = await DownloadApi.GetUserDetailStatsAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load user details");
+            Message = "Failed to load user details.";
+            MessageClass = "alert-danger";
+        }
+    }
+
+    private double GetSuccessRate()
+    {
+        if (GlobalStats?.StatusCounts == null) return 0;
+        var completed = GlobalStats.StatusCounts.GetValueOrDefault("Completed", 0);
+        var total = GlobalStats.StatusCounts.Values.Sum();
+        return total > 0 ? Math.Round((double)completed / total * 100, 1) : 0;
+    }
+
+    private double GetUserSuccessRate(UserStatsDto user)
+    {
+        var total = user.CompletedDownloads + user.FailedDownloads;
+        return total > 0 ? Math.Round((double)user.CompletedDownloads / total * 100, 1) : 0;
+    }
+
+    private string GetStatusBadgeClass(string status) => status.ToLower() switch
+    {
+        "completed" => "bg-success",
+        "failed" => "bg-danger",
+        "downloading" => "bg-info",
+        "pending" => "bg-warning text-dark",
+        _ => "bg-secondary"
+    };
+
+    // DTOs
+    public class GlobalStatsDto
+    {
+        public int TotalDownloads { get; set; }
+        public long TotalStorageBytes { get; set; }
+        public double TotalStorageMB { get; set; }
+        public List<DailyDownloadCountDto> DownloadsPerDay { get; set; } = new();
+        public Dictionary<string, int> StatusCounts { get; set; } = new();
+        public int ActiveUsersLast7Days { get; set; }
+    }
+
+    public class DailyDownloadCountDto
+    {
+        public string Date { get; set; } = "";
+        public int Count { get; set; }
+    }
+
+    public class UserStatsDto
+    {
+        public string UserId { get; set; } = "";
+        public int TotalDownloads { get; set; }
+        public double TotalStorageMB { get; set; }
+        public int CompletedDownloads { get; set; }
+        public int FailedDownloads { get; set; }
+        public DateTime? LastActive { get; set; }
+    }
+
+    public class UserDetailStatsDto : UserStatsDto
+    {
+        public List<ArtistCountDto> TopArtists { get; set; } = new();
+        public List<DailyDownloadCountDto> DownloadsPerDay { get; set; } = new();
+    }
+
+    public class ArtistCountDto
+    {
+        public string Artist { get; set; } = "";
+        public int Count { get; set; }
+    }
+}
