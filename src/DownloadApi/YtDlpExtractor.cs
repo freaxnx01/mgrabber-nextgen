@@ -9,6 +9,31 @@ public class YtDlpExtractor : IAudioExtractor
     private readonly string _ytDlpPath = "yt-dlp";
     private readonly string _storagePath = "/storage";
 
+    // Patterns to remove from filenames (case-insensitive)
+    private static readonly string[] PatternsToRemove = new[]
+    {
+        @"\(Official\s+Music\s+Video\)",
+        @"\(Official\s+Video\)",
+        @"\(Music\s+Video\)",
+        @"\(Official\s+Audio\)",
+        @"\(Audio\)",
+        @"\(Lyrics?\s+Video\)",
+        @"\(Lyrics?\)",
+        @"\(Lyric\)",
+        @"\(HD\)",
+        @"\(HQ\)",
+        @"\(Remastered\)",
+        @"\(Remaster\)",
+        @"\(Live\)",
+        @"\(Live\s+Performance\)",
+        @"\(Acoustic\)",
+        @"\(Cover\)",
+        @"\(Visualizer\)",
+        @"\(Official\)",
+        @"\(Explicit\)",
+        @"\(Clean\)",
+    };
+
     public YtDlpExtractor(ILogger<YtDlpExtractor> logger)
     {
         _logger = logger;
@@ -112,7 +137,9 @@ public class YtDlpExtractor : IAudioExtractor
                 // Custom filename: Author - Title.mp3
                 if (!string.IsNullOrEmpty(author) && !string.IsNullOrEmpty(title))
                 {
-                    var filename = $"{SanitizeFilename(author)} - {SanitizeFilename(title)}.%(ext)s";
+                    // Clean the title by removing promotional suffixes
+                    var cleanedTitle = CleanTitle(title);
+                    var filename = $"{SanitizeFilename(author)} - {SanitizeFilename(cleanedTitle)}.%(ext)s";
                     outputTemplate = Path.Combine(outputDir, filename);
                 }
                 else
@@ -206,6 +233,28 @@ public class YtDlpExtractor : IAudioExtractor
             }
         }
         return null;
+    }
+
+    private string CleanTitle(string? title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return title ?? "";
+
+        var cleaned = title;
+        
+        // Remove each pattern (case-insensitive)
+        foreach (var pattern in PatternsToRemove)
+        {
+            cleaned = Regex.Replace(cleaned, pattern, "", RegexOptions.IgnoreCase);
+        }
+        
+        // Clean up extra whitespace and trim
+        cleaned = Regex.Replace(cleaned, @"\s+", " ").Trim();
+        
+        // Remove any remaining empty parentheses
+        cleaned = Regex.Replace(cleaned, @"\(\s*\)", "");
+        
+        return cleaned.Trim();
     }
 
     private string? FindDownloadedFile(string directory, string format)

@@ -5,6 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 builder.Services.AddSingleton<IAudioExtractor, YtDlpExtractor>();
+builder.Services.AddSingleton<AudioNormalizer>();
 builder.Services.AddHealthChecks();
 
 // Add SQLite repository
@@ -17,6 +18,7 @@ builder.Services.AddSingleton<JobRepository>(sp =>
 });
 
 var app = builder.Build();
+var _logger = app.Services.GetRequiredService<ILogger<Program>>();
 
 // Health check endpoint
 app.MapGet("/api/health", async (IAudioExtractor extractor) =>
@@ -143,7 +145,7 @@ app.MapPost("/api/download/start", async (DownloadRequest request, JobRepository
     // Start async extraction (fire and forget for MVP)
     _ = Task.Run(async () =>
     {
-        await ProcessDownloadAsync(job.Id, repo, extractor);
+        await ProcessDownloadAsync(job.Id, repo, extractor, builder.Services.BuildServiceProvider().GetRequiredService<AudioNormalizer>(), request.Normalize, request.NormalizationLevel);
     });
 
     return Results.Accepted($"/api/download/status/{job.Id}", new
@@ -353,7 +355,7 @@ app.MapDelete("/api/files/{userId}/{jobId}", async (string userId, string jobId,
 });
 
 // Background download processor with retry logic
-async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtractor extractor)
+async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtractor extractor, AudioNormalizer normalizer, bool normalize, double? normalizationLevel)
 {
     const int maxRetries = 3;
     
@@ -382,12 +384,47 @@ async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtracto
                 // Store filenames before updating status
                 await repo.UpdateFilenamesAsync(jobId, result.OriginalFilename, result.CorrectedFilename);
                 
+                string finalFilePath = result.FilePath;
+                long finalFileSize = result.FileSizeBytes;
+
+                // Apply audio normalization if requested
+                if (normalize)
+                {
+                    await repo.UpdateJobStatusAsync(jobId, JobStatus.Downloading, 80, errorMessage: "Normalizing audio...");
+                    
+                    var normOptions = new NormalizationOptions();
+                    if (normalizationLevel.HasValue)
+                    {
+                        normOptions.TargetLoudness = normalizationLevel.Value;
+                    }
+                    
+                    var normOutputPath = result.FilePath + ".normalized.mp3";
+                    var normResult = await normalizer.NormalizeAsync(result.FilePath, normOutputPath, normOptions);
+                    
+                    if (normResult.Success)
+                    {
+                        // Replace original with normalized
+                        File.Delete(result.FilePath);
+                        File.Move(normOutputPath, result.FilePath);
+                        finalFileSize = normResult.OutputSizeBytes;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Normalization failed for {JobId}: {Error}. Using unnormalized file.", jobId, normResult.Error);
+                        // Clean up failed normalization file if exists
+                        if (File.Exists(normOutputPath))
+                        {
+                            File.Delete(normOutputPath);
+                        }
+                    }
+                }
+                
                 await repo.UpdateJobStatusAsync(
                     jobId, 
                     JobStatus.Completed, 
                     100, 
-                    result.FilePath, 
-                    result.FileSizeBytes
+                    finalFilePath, 
+                    finalFileSize
                 );
                 return; // Success!
             }
@@ -421,5 +458,7 @@ public record DownloadRequest(
     string UserId,
     string? Format = "mp3",
     string? Title = null,
-    string? Author = null
+    string? Author = null,
+    bool Normalize = false,
+    double? NormalizationLevel = null
 );
