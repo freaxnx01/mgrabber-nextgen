@@ -168,11 +168,14 @@ app.MapGet("/api/download/status/{jobId}", async (string jobId, JobRepository re
         job.Id,
         job.UserId,
         job.Url,
+        job.VideoId,
         job.Title,
         job.Author,
         job.Format,
         Status = job.Status.ToString(),
         job.Progress,
+        job.OriginalFilename,
+        job.CorrectedFilename,
         job.FilePath,
         job.FileSizeBytes,
         job.ErrorMessage,
@@ -376,6 +379,9 @@ async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtracto
 
             if (result.Success && !string.IsNullOrEmpty(result.FilePath))
             {
+                // Store filenames before updating status
+                await repo.UpdateFilenamesAsync(jobId, result.OriginalFilename, result.CorrectedFilename);
+                
                 await repo.UpdateJobStatusAsync(
                     jobId, 
                     JobStatus.Completed, 

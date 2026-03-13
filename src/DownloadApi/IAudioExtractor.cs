@@ -12,6 +12,8 @@ public class ExtractionResult
 {
     public bool Success { get; set; }
     public string? FilePath { get; set; }
+    public string? OriginalFilename { get; set; }
+    public string? CorrectedFilename { get; set; }
     public string? Error { get; set; }
     public long FileSizeBytes { get; set; }
 }

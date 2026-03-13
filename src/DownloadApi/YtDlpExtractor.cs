@@ -153,11 +153,17 @@ public class YtDlpExtractor : IAudioExtractor
                 var downloadedFile = FindDownloadedFile(outputDir, formatArg);
                 var fileSize = downloadedFile != null ? new FileInfo(downloadedFile).Length : 0;
 
+                // Get the original filename from the output
+                var originalFilename = ExtractOriginalFilename(output);
+                var correctedFilename = Path.GetFileName(downloadedFile);
+
                 return new ExtractionResult
                 {
                     Success = true,
                     FilePath = downloadedFile,
-                    FileSizeBytes = fileSize
+                    FileSizeBytes = fileSize,
+                    OriginalFilename = originalFilename,
+                    CorrectedFilename = correctedFilename
                 };
             }
             else
@@ -179,6 +185,27 @@ public class YtDlpExtractor : IAudioExtractor
                 Error = ex.Message
             };
         }
+    }
+
+    private string? ExtractOriginalFilename(string ytDlpOutput)
+    {
+        // Try to extract the destination filename from yt-dlp output
+        // Example: "[download] Destination: /path/to/filename.mp3"
+        var lines = ytDlpOutput.Split('\n');
+        foreach (var line in lines)
+        {
+            if (line.Contains("Destination:") || line.Contains("[download]"))
+            {
+                // Extract filename from the line
+                var match = System.Text.RegularExpressions.Regex.Match(line, @"Destination:\s*(.+)$");
+                if (match.Success)
+                {
+                    var fullPath = match.Groups[1].Value.Trim();
+                    return Path.GetFileName(fullPath);
+                }
+            }
+        }
+        return null;
     }
 
     private string? FindDownloadedFile(string directory, string format)

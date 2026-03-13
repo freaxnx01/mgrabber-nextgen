@@ -25,11 +25,14 @@ public class JobRepository
                 Id TEXT PRIMARY KEY,
                 UserId TEXT NOT NULL,
                 Url TEXT NOT NULL,
+                VideoId TEXT,
                 Title TEXT,
                 Author TEXT,
                 Format TEXT NOT NULL,
                 Status TEXT NOT NULL,
                 Progress INTEGER DEFAULT 0,
+                OriginalFilename TEXT,
+                CorrectedFilename TEXT,
                 FilePath TEXT,
                 FileSizeBytes INTEGER DEFAULT 0,
                 ErrorMessage TEXT,
@@ -41,9 +44,31 @@ public class JobRepository
 
             CREATE INDEX IF NOT EXISTS idx_jobs_user ON DownloadJobs(UserId);
             CREATE INDEX IF NOT EXISTS idx_jobs_status ON DownloadJobs(Status);
+            CREATE INDEX IF NOT EXISTS idx_jobs_videoid ON DownloadJobs(VideoId);
         ";
         cmd.ExecuteNonQuery();
+
+        // Migration: Add new columns if they don't exist (for existing databases)
+        AddColumnIfNotExists(connection, "VideoId", "TEXT");
+        AddColumnIfNotExists(connection, "OriginalFilename", "TEXT");
+        AddColumnIfNotExists(connection, "CorrectedFilename", "TEXT");
+
         _logger.LogInformation("Database initialized");
+    }
+
+    private void AddColumnIfNotExists(SqliteConnection connection, string columnName, string columnType)
+    {
+        try
+        {
+            var cmd = connection.CreateCommand();
+            cmd.CommandText = $"ALTER TABLE DownloadJobs ADD COLUMN {columnName} {columnType}";
+            cmd.ExecuteNonQuery();
+            _logger.LogInformation($"Added column {columnName}");
+        }
+        catch (SqliteException ex) when (ex.Message.Contains("duplicate column"))
+        {
+            // Column already exists, ignore
+        }
     }
 
     public async Task<DownloadJob> CreateJobAsync(string userId, string url, string format, string? title = null, string? author = null)
@@ -53,6 +78,7 @@ public class JobRepository
             Id = Guid.NewGuid().ToString("N"),
             UserId = userId,
             Url = url,
+            VideoId = ExtractVideoId(url),
             Title = title,
             Author = author,
             Format = format,
@@ -66,12 +92,13 @@ public class JobRepository
 
         var cmd = connection.CreateCommand();
         cmd.CommandText = @"
-            INSERT INTO DownloadJobs (Id, UserId, Url, Title, Author, Format, Status, Progress, FileSizeBytes, RetryCount, CreatedAt, UpdatedAt)
-            VALUES (@id, @userId, @url, @title, @author, @format, @status, 0, 0, 0, @createdAt, @updatedAt)";
+            INSERT INTO DownloadJobs (Id, UserId, Url, VideoId, Title, Author, Format, Status, Progress, FileSizeBytes, RetryCount, CreatedAt, UpdatedAt)
+            VALUES (@id, @userId, @url, @videoId, @title, @author, @format, @status, 0, 0, 0, @createdAt, @updatedAt)";
         
         cmd.Parameters.AddWithValue("@id", job.Id);
         cmd.Parameters.AddWithValue("@userId", job.UserId);
         cmd.Parameters.AddWithValue("@url", job.Url);
+        cmd.Parameters.AddWithValue("@videoId", job.VideoId ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@title", job.Title ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@author", job.Author ?? (object)DBNull.Value);
         cmd.Parameters.AddWithValue("@format", job.Format);
@@ -81,6 +108,25 @@ public class JobRepository
 
         await cmd.ExecuteNonQueryAsync();
         return job;
+    }
+
+    public async Task UpdateFilenamesAsync(string jobId, string? originalFilename, string? correctedFilename)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            UPDATE DownloadJobs 
+            SET OriginalFilename = @originalFilename, CorrectedFilename = @correctedFilename, UpdatedAt = @updatedAt
+            WHERE Id = @id";
+        
+        cmd.Parameters.AddWithValue("@id", jobId);
+        cmd.Parameters.AddWithValue("@originalFilename", originalFilename ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@correctedFilename", correctedFilename ?? (object)DBNull.Value);
+        cmd.Parameters.AddWithValue("@updatedAt", DateTime.UtcNow.ToString("O"));
+
+        await cmd.ExecuteNonQueryAsync();
     }
 
     public async Task<DownloadJob?> GetJobAsync(string jobId)
@@ -379,19 +425,48 @@ public class JobRepository
             Id = reader.GetString(0),
             UserId = reader.GetString(1),
             Url = reader.GetString(2),
-            Title = reader.IsDBNull(3) ? null : reader.GetString(3),
-            Author = reader.IsDBNull(4) ? null : reader.GetString(4),
-            Format = reader.GetString(5),
-            Status = Enum.Parse<JobStatus>(reader.GetString(6)),
-            Progress = reader.GetInt32(7),
-            FilePath = reader.IsDBNull(8) ? null : reader.GetString(8),
-            FileSizeBytes = reader.GetInt64(9),
-            ErrorMessage = reader.IsDBNull(10) ? null : reader.GetString(10),
-            RetryCount = reader.GetInt32(11),
-            CreatedAt = DateTime.Parse(reader.GetString(12)),
-            CompletedAt = reader.IsDBNull(13) ? null : DateTime.Parse(reader.GetString(13)),
-            UpdatedAt = DateTime.Parse(reader.GetString(14))
+            VideoId = reader.IsDBNull(3) ? null : reader.GetString(3),
+            Title = reader.IsDBNull(4) ? null : reader.GetString(4),
+            Author = reader.IsDBNull(5) ? null : reader.GetString(5),
+            Format = reader.GetString(6),
+            Status = Enum.Parse<JobStatus>(reader.GetString(7)),
+            Progress = reader.GetInt32(8),
+            OriginalFilename = reader.IsDBNull(9) ? null : reader.GetString(9),
+            CorrectedFilename = reader.IsDBNull(10) ? null : reader.GetString(10),
+            FilePath = reader.IsDBNull(11) ? null : reader.GetString(11),
+            FileSizeBytes = reader.GetInt64(12),
+            ErrorMessage = reader.IsDBNull(13) ? null : reader.GetString(13),
+            RetryCount = reader.GetInt32(14),
+            CreatedAt = DateTime.Parse(reader.GetString(15)),
+            CompletedAt = reader.IsDBNull(16) ? null : DateTime.Parse(reader.GetString(16)),
+            UpdatedAt = DateTime.Parse(reader.GetString(17))
         };
+    }
+
+    // Extract YouTube Video ID from URL
+    public static string? ExtractVideoId(string url)
+    {
+        // Handle various YouTube URL formats
+        // youtube.com/watch?v=VIDEO_ID
+        // youtu.be/VIDEO_ID
+        // youtube.com/v/VIDEO_ID
+        var patterns = new[]
+        {
+            @"[?&]v=([a-zA-Z0-9_-]{11})",
+            @"youtu\.be/([a-zA-Z0-9_-]{11})",
+            @"youtube\.com/v/([a-zA-Z0-9_-]{11})"
+        };
+
+        foreach (var pattern in patterns)
+        {
+            var match = System.Text.RegularExpressions.Regex.Match(url, pattern);
+            if (match.Success && match.Groups.Count > 1)
+            {
+                return match.Groups[1].Value;
+            }
+        }
+
+        return null;
     }
 }
 
@@ -400,11 +475,14 @@ public class DownloadJob
     public string Id { get; set; } = "";
     public string UserId { get; set; } = "";
     public string Url { get; set; } = "";
+    public string? VideoId { get; set; }
     public string? Title { get; set; }
     public string? Author { get; set; }
     public string Format { get; set; } = "";
     public JobStatus Status { get; set; }
     public int Progress { get; set; }
+    public string? OriginalFilename { get; set; }
+    public string? CorrectedFilename { get; set; }
     public string? FilePath { get; set; }
     public long FileSizeBytes { get; set; }
     public string? ErrorMessage { get; set; }
