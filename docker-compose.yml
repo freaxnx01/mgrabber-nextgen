@@ -15,6 +15,7 @@ services:
       - API_KEY=${API_KEY:-default-dev-key-change-in-production}
     volumes:
       - storage:/storage
+      - data:/data
     networks:
       - internal
     healthcheck:
@@ -41,4 +42,6 @@ networks:
 
 volumes:
   storage:
+    driver: local
+  data:
     driver: local
