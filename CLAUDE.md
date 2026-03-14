@@ -6,6 +6,20 @@ Agent context for Claude Code. Read this before taking any action in this reposi
 
 ---
 
+## ⚠️ CRITICAL: UI Workflow Enforcement
+
+**BEFORE any UI/component work, read `.ai/UI_WORKFLOW_GUARDRAILS.md`**
+
+The 4-phase UI workflow is **MANDATORY** and must never be skipped:
+1. **Brainstorm** → ASCII wireframe approval
+2. **Flow** → Mermaid diagram approval  
+3. **Build** → Component code
+4. **Review** → Checklist verification
+
+**Never write `.razor` code before phases 1-2 are complete and approved.**
+
+---
+
 ## Project Overview
 
 <!-- TODO: Fill in per project -->
