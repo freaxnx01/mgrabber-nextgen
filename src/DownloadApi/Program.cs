@@ -13,6 +13,12 @@ builder.Services.AddSingleton<IAudioExtractor, YtDlpExtractor>();
 builder.Services.AddSingleton<AudioNormalizer>();
 builder.Services.AddHealthChecks();
 
+// Add memory cache for YouTube API responses
+builder.Services.AddMemoryCache();
+
+// Add HTTP client for YouTube API
+builder.Services.AddHttpClient<IYouTubeSearchService, YouTubeSearchService>();
+
 // Add email service
 builder.Services.AddTransient<IEmailService, SmtpEmailService>();
 
@@ -46,40 +52,48 @@ app.MapGet("/api/health", async (IAudioExtractor extractor) =>
     });
 });
 
-// ========== YouTube Search (Mock) ==========
-app.MapGet("/api/search/youtube", (string? q) =>
+// ========== YouTube Search (Real API) ==========
+app.MapGet("/api/search/youtube", async (string? q, IYouTubeSearchService youTubeService) =>
 {
     if (string.IsNullOrWhiteSpace(q))
     {
         return Results.BadRequest(new { Error = "Query parameter 'q' is required" });
     }
 
-    // Mock data for MVP
-    var mockResults = new[]
+    try
     {
-        new {
-            VideoId = "dQw4w9WgXcQ",
-            Title = $"{q} - Official Audio",
-            Author = "Music Channel",
-            Duration = "3:45",
-            ThumbnailUrl = "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
-        },
-        new {
-            VideoId = "abc123xyz",
-            Title = $"{q} - Live Performance",
-            Author = "Live Music",
-            Duration = "4:20",
-            ThumbnailUrl = "https://i.ytimg.com/vi/abc123xyz/hqdefault.jpg"
-        }
-    };
-
-    return Results.Ok(new
+        var result = await youTubeService.SearchAsync(q, maxResults: 10);
+        return Results.Ok(new
+        {
+            Query = result.Query,
+            Results = result.Results.Select(r => new
+            {
+                r.VideoId,
+                r.Title,
+                r.Author,
+                r.Duration,
+                r.ThumbnailUrl
+            }),
+            result.TotalResults,
+            Cached = false
+        });
+    }
+    catch (InvalidOperationException ex) when (ex.Message.Contains("API key"))
     {
-        Query = q,
-        Results = mockResults,
-        TotalResults = mockResults.Length,
-        Note = "Mock data for MVP - integrate YouTube Data API v3 for real results"
-    });
+        _logger.LogError(ex, "YouTube API configuration error");
+        return Results.Problem(
+            title: "YouTube API Error",
+            detail: "YouTube API key not configured or invalid. Please check your configuration.",
+            statusCode: 500);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to search YouTube");
+        return Results.Problem(
+            title: "Search Error",
+            detail: "Failed to search YouTube. Please try again later.",
+            statusCode: 500);
+    }
 });
 
 // ========== MusicBrainz Search (Mock) ==========

@@ -33,6 +33,9 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - API_KEY=${API_KEY:-default-dev-key-change-in-production}
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
     volumes:
       - storage:/storage
