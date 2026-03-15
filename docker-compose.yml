@@ -33,6 +33,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - API_KEY=${API_KEY:-default-dev-key-change-in-production}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
     volumes:
       - storage:/storage
       - data:/data

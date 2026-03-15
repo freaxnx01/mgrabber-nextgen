@@ -1,5 +1,6 @@
 using DownloadApi;
 using DownloadApi.Data;
+using DownloadApi.Services;
 
 // Request DTOs
 public record AddToWhitelistRequest(string UserId, bool SendWelcomeEmail = false);
@@ -11,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSingleton<IAudioExtractor, YtDlpExtractor>();
 builder.Services.AddSingleton<AudioNormalizer>();
 builder.Services.AddHealthChecks();
+
+// Add email service
+builder.Services.AddTransient<IEmailService, SmtpEmailService>();
 
 // Add SQLite repository
 builder.Services.AddSingleton<JobRepository>(sp => 
@@ -303,7 +307,7 @@ app.MapGet("/api/admin/whitelist", async (JobRepository repo) =>
 });
 
 // Add user to whitelist (admin only)
-app.MapPost("/api/admin/whitelist", async (AddToWhitelistRequest request, JobRepository repo, HttpContext httpContext) =>
+app.MapPost("/api/admin/whitelist", async (AddToWhitelistRequest request, JobRepository repo, IEmailService emailService, HttpContext httpContext) =>
 {
     // Check if already whitelisted
     var existing = await repo.GetWhitelistByUserIdAsync(request.UserId);
@@ -317,7 +321,20 @@ app.MapPost("/api/admin/whitelist", async (AddToWhitelistRequest request, JobRep
 
     _logger.LogInformation("Added {UserId} to whitelist by {AdminId}", request.UserId, adminId);
 
-    // TODO: Queue welcome email if requested
+    // Send welcome email if requested
+    if (request.SendWelcomeEmail)
+    {
+        try
+        {
+            await emailService.SendWelcomeEmailAsync(request.UserId, request.UserId);
+            _logger.LogInformation("Welcome email sent to {Email}", request.UserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send welcome email to {Email}", request.UserId);
+            // Don't fail the request if email fails, just log it
+        }
+    }
 
     return Results.Created($"/api/admin/whitelist/{entry.Id}", entry);
 });

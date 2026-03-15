@@ -1,0 +1,9 @@
+# Email Service Configuration
+# Copy this file to appsettings.Production.json and fill in the SMTP password
+# DO NOT commit appsettings.Production.json to git!
+
+{
+  "Smtp": {
+    "Password": "YOUR_SMTP_PASSWORD_HERE"
+  }
+}
