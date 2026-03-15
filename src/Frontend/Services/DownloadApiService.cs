@@ -239,6 +239,53 @@ public class DownloadApiService
             throw;
         }
     }
+
+    // ========== MusicBrainz Search Methods ==========
+
+    public async Task<MusicBrainzSearchResultDto?> SearchMusicBrainzArtistsAsync(string query)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/search/musicbrainz?type=artist&q={Uri.EscapeDataString(query)}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<MusicBrainzSearchResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to search MusicBrainz artists");
+            return null;
+        }
+    }
+
+    public async Task<MusicBrainzSearchResultDto?> SearchMusicBrainzTracksAsync(string query)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/search/musicbrainz?type=track&q={Uri.EscapeDataString(query)}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<MusicBrainzSearchResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to search MusicBrainz tracks");
+            return null;
+        }
+    }
+
+    public async Task<MusicBrainzSearchResultDto?> SearchMusicBrainzReleasesAsync(string query)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/search/musicbrainz?type=album&q={Uri.EscapeDataString(query)}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<MusicBrainzSearchResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to search MusicBrainz releases");
+            return null;
+        }
+    }
 }
 
 // DTOs
@@ -356,3 +403,47 @@ public class WhitelistEntryDto
 
 public record AddToWhitelistRequestDto(string UserId, bool SendWelcomeEmail = false);
 public record UpdateWhitelistRequestDto(bool IsActive);
+
+// MusicBrainz DTOs
+public class MusicBrainzSearchResultDto
+{
+    public string Query { get; set; } = "";
+    public string Type { get; set; } = "";
+    public List<MusicBrainzArtistDto> Artists { get; set; } = new();
+    public List<MusicBrainzTrackDto> Tracks { get; set; } = new();
+    public List<MusicBrainzReleaseDto> Releases { get; set; } = new();
+    public int TotalCount { get; set; }
+}
+
+public class MusicBrainzArtistDto
+{
+    public string? Id { get; set; }
+    public string? Name { get; set; }
+    public string? SortName { get; set; }
+    public string? Country { get; set; }
+    public string? Type { get; set; }
+    public string? Disambiguation { get; set; }
+    public int? Score { get; set; }
+    public List<string> Genres { get; set; } = new();
+}
+
+public class MusicBrainzTrackDto
+{
+    public string? Id { get; set; }
+    public string? Title { get; set; }
+    public string? FormattedDuration { get; set; }
+    public int? Score { get; set; }
+    public string? Artist { get; set; }
+    public string? ArtistId { get; set; }
+}
+
+public class MusicBrainzReleaseDto
+{
+    public string? Id { get; set; }
+    public string? Title { get; set; }
+    public string? Date { get; set; }
+    public string? Country { get; set; }
+    public int? TrackCount { get; set; }
+    public int? Score { get; set; }
+    public string? Artist { get; set; }
+}

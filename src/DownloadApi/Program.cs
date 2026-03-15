@@ -19,6 +19,9 @@ builder.Services.AddMemoryCache();
 // Add HTTP client for YouTube API
 builder.Services.AddHttpClient<IYouTubeSearchService, YouTubeSearchService>();
 
+// Add HTTP client for MusicBrainz API
+builder.Services.AddHttpClient<IMusicBrainzService, MusicBrainzService>();
+
 // Add email service
 builder.Services.AddTransient<IEmailService, SmtpEmailService>();
 
@@ -96,8 +99,8 @@ app.MapGet("/api/search/youtube", async (string? q, IYouTubeSearchService youTub
     }
 });
 
-// ========== MusicBrainz Search (Mock) ==========
-app.MapGet("/api/search/musicbrainz", (string? type, string? q) =>
+// ========== MusicBrainz Search (Real API) ==========
+app.MapGet("/api/search/musicbrainz", async (string? type, string? q, IMusicBrainzService musicBrainzService) =>
 {
     if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(q))
     {
@@ -109,35 +112,93 @@ app.MapGet("/api/search/musicbrainz", (string? type, string? q) =>
         return Results.BadRequest(new { Error = "Type must be 'artist', 'album', or 'track'" });
     }
 
-    // Mock data
-    var mockResults = type.ToLower() switch
+    try
     {
-        "artist" => new[]
+        var result = type.ToLower() switch
         {
-            new { Id = "artist-1", Name = q, Type = "Group", Country = "US" },
-            new { Id = "artist-2", Name = $"{q} (Band)", Type = "Group", Country = "UK" }
-        },
-        "album" => new[]
-        {
-            new { Id = "album-1", Title = $"{q} - Greatest Hits", Artist = "Various Artists", Year = 2024 },
-            new { Id = "album-2", Title = $"{q} - Live", Artist = q, Year = 2023 }
-        },
-        "track" => new[]
-        {
-            new { Id = "track-1", Title = $"{q} Song", Artist = "Test Artist", Duration = "3:30" },
-            new { Id = "track-2", Title = $"Best of {q}", Artist = "Various", Duration = "4:15" }
-        },
-        _ => Array.Empty<object>()
-    };
+            "artist" => await musicBrainzService.SearchArtistsAsync(q, limit: 10),
+            "track" => await musicBrainzService.SearchTracksAsync(q, limit: 10),
+            "album" => await musicBrainzService.SearchReleasesAsync(q, limit: 10),
+            _ => throw new InvalidOperationException("Invalid search type")
+        };
 
-    return Results.Ok(new
+        return Results.Ok(new
+        {
+            result.Query,
+            result.Type,
+            Artists = result.Artists.Select(a => new
+            {
+                a.Id,
+                a.Name,
+                a.SortName,
+                a.Country,
+                a.Type,
+                a.Disambiguation,
+                a.Score
+            }),
+            Tracks = result.Tracks.Select(t => new
+            {
+                t.Id,
+                t.Title,
+                t.FormattedDuration,
+                t.Score,
+                Artist = t.ArtistCredit.FirstOrDefault()?.Name,
+                ArtistId = t.ArtistCredit.FirstOrDefault()?.Artist?.Id
+            }),
+            Releases = result.Releases.Select(r => new
+            {
+                r.Id,
+                r.Title,
+                r.Date,
+                r.Country,
+                r.TrackCount,
+                r.Score,
+                Artist = r.ArtistCredit.FirstOrDefault()?.Name
+            }),
+            result.TotalCount
+        });
+    }
+    catch (Exception ex)
     {
-        Query = q,
-        Type = type,
-        Results = mockResults,
-        TotalResults = mockResults.Length,
-        Note = "Mock data for MVP - integrate real MusicBrainz API for production"
-    });
+        _logger.LogError(ex, "Failed to search MusicBrainz");
+        return Results.Problem(
+            title: "Search Error",
+            detail: "Failed to search MusicBrainz. Please try again later.",
+            statusCode: 500);
+    }
+});
+
+// ========== MusicBrainz Artist Details ==========
+app.MapGet("/api/musicbrainz/artist/{artistId}", async (string artistId, IMusicBrainzService musicBrainzService) =>
+{
+    try
+    {
+        var artist = await musicBrainzService.GetArtistDetailsAsync(artistId);
+        if (artist == null)
+        {
+            return Results.NotFound(new { Error = "Artist not found" });
+        }
+
+        return Results.Ok(new
+        {
+            artist.Id,
+            artist.Name,
+            artist.SortName,
+            artist.Country,
+            artist.Type,
+            artist.Disambiguation,
+            artist.Genres,
+            artist.Urls
+        });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to get MusicBrainz artist details");
+        return Results.Problem(
+            title: "Artist Details Error",
+            detail: "Failed to retrieve artist details. Please try again later.",
+            statusCode: 500);
+    }
 });
 
 // ========== Download Start ==========
