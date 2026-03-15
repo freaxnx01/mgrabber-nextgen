@@ -1,0 +1,29 @@
+http:
+  routers:
+    mgrabber:
+      rule: "Host(`mgrabber.home.freaxnx01.ch`)"
+      entryPoints:
+        - "websecure"
+      tls:
+        certResolver: "letsencrypt"
+      service: "mgrabber"
+    
+    mgrabber-http:
+      rule: "Host(`mgrabber.home.freaxnx01.ch`)"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "https-redirect"
+      service: "mgrabber"
+  
+  services:
+    mgrabber:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.124:8086"
+  
+  middlewares:
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
