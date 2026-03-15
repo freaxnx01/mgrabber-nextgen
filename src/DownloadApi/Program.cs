@@ -1,6 +1,10 @@
 using DownloadApi;
 using DownloadApi.Data;
 
+// Request DTOs
+public record AddToWhitelistRequest(string UserId, bool SendWelcomeEmail = false);
+public record UpdateWhitelistRequest(bool IsActive);
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services
@@ -287,6 +291,61 @@ app.MapGet("/api/admin/stats/users", async (JobRepository repo) =>
         u.FailedDownloads,
         u.LastActive
     }));
+});
+
+// ========== Admin Whitelist Management ==========
+
+// Get all whitelisted users (admin only)
+app.MapGet("/api/admin/whitelist", async (JobRepository repo) =>
+{
+    var users = await repo.GetWhitelistAsync();
+    return Results.Ok(users);
+});
+
+// Add user to whitelist (admin only)
+app.MapPost("/api/admin/whitelist", async (AddToWhitelistRequest request, JobRepository repo, HttpContext httpContext) =>
+{
+    // Check if already whitelisted
+    var existing = await repo.GetWhitelistByUserIdAsync(request.UserId);
+    if (existing != null)
+    {
+        return Results.Conflict(new { Message = "User is already whitelisted" });
+    }
+
+    var adminId = httpContext.User.Identity?.Name ?? "system";
+    var entry = await repo.AddToWhitelistAsync(request.UserId, adminId, request.SendWelcomeEmail);
+
+    _logger.LogInformation("Added {UserId} to whitelist by {AdminId}", request.UserId, adminId);
+
+    // TODO: Queue welcome email if requested
+
+    return Results.Created($"/api/admin/whitelist/{entry.Id}", entry);
+});
+
+// Update whitelist status (admin only)
+app.MapPut("/api/admin/whitelist/{id}", async (string id, UpdateWhitelistRequest request, JobRepository repo) =>
+{
+    var entry = await repo.GetWhitelistEntryAsync(id);
+    if (entry == null) return Results.NotFound(new { Error = "Entry not found" });
+
+    await repo.UpdateWhitelistStatusAsync(id, request.IsActive);
+    
+    _logger.LogInformation("Updated whitelist status for {UserId} to {IsActive}", entry.UserId, request.IsActive);
+    
+    return Results.NoContent();
+});
+
+// Remove from whitelist (admin only)
+app.MapDelete("/api/admin/whitelist/{id}", async (string id, JobRepository repo) =>
+{
+    var entry = await repo.GetWhitelistEntryAsync(id);
+    if (entry == null) return Results.NotFound(new { Error = "Entry not found" });
+
+    await repo.RemoveFromWhitelistAsync(id);
+    
+    _logger.LogInformation("Removed {UserId} from whitelist", entry.UserId);
+    
+    return Results.NoContent();
 });
 
 // Get specific user stats (admin only)

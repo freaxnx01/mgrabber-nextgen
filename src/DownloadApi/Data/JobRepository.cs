@@ -45,6 +45,17 @@ public class JobRepository
             CREATE INDEX IF NOT EXISTS idx_jobs_user ON DownloadJobs(UserId);
             CREATE INDEX IF NOT EXISTS idx_jobs_status ON DownloadJobs(Status);
             CREATE INDEX IF NOT EXISTS idx_jobs_videoid ON DownloadJobs(VideoId);
+
+            CREATE TABLE IF NOT EXISTS Whitelist (
+                Id TEXT PRIMARY KEY,
+                UserId TEXT NOT NULL UNIQUE,
+                AddedBy TEXT NOT NULL,
+                AddedAt TEXT NOT NULL,
+                IsActive INTEGER NOT NULL DEFAULT 1,
+                WelcomeEmailSent INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_whitelist_user ON Whitelist(UserId);
         ";
         cmd.ExecuteNonQuery();
 
@@ -468,6 +479,136 @@ public class JobRepository
 
         return null;
     }
+
+    // Whitelist Management Methods
+    public async Task<List<WhitelistEntry>> GetWhitelistAsync()
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+        
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT * FROM Whitelist ORDER BY AddedAt DESC";
+        
+        var entries = new List<WhitelistEntry>();
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                entries.Add(MapWhitelistEntry(reader));
+            }
+        }
+        return entries;
+    }
+
+    public async Task<WhitelistEntry?> GetWhitelistEntryAsync(string id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+        
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT * FROM Whitelist WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            if (await reader.ReadAsync())
+            {
+                return MapWhitelistEntry(reader);
+            }
+        }
+        return null;
+    }
+
+    public async Task<WhitelistEntry?> GetWhitelistByUserIdAsync(string userId)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+        
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT * FROM Whitelist WHERE UserId = @userId";
+        cmd.Parameters.AddWithValue("@userId", userId);
+        
+        using (var reader = await cmd.ExecuteReaderAsync())
+        {
+            if (await reader.ReadAsync())
+            {
+                return MapWhitelistEntry(reader);
+            }
+        }
+        return null;
+    }
+
+    public async Task<WhitelistEntry> AddToWhitelistAsync(string userId, string addedBy, bool sendWelcomeEmail)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+        
+        var entry = new WhitelistEntry
+        {
+            Id = Guid.NewGuid().ToString(),
+            UserId = userId,
+            AddedBy = addedBy,
+            AddedAt = DateTime.UtcNow,
+            IsActive = true,
+            WelcomeEmailSent = false
+        };
+        
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = @"
+            INSERT INTO Whitelist (Id, UserId, AddedBy, AddedAt, IsActive, WelcomeEmailSent)
+            VALUES (@id, @userId, @addedBy, @addedAt, @isActive, @welcomeEmailSent)";
+        cmd.Parameters.AddWithValue("@id", entry.Id);
+        cmd.Parameters.AddWithValue("@userId", entry.UserId);
+        cmd.Parameters.AddWithValue("@addedBy", entry.AddedBy);
+        cmd.Parameters.AddWithValue("@addedAt", entry.AddedAt.ToString("O"));
+        cmd.Parameters.AddWithValue("@isActive", entry.IsActive ? 1 : 0);
+        cmd.Parameters.AddWithValue("@welcomeEmailSent", entry.WelcomeEmailSent ? 1 : 0);
+        
+        await cmd.ExecuteNonQueryAsync();
+        _logger.LogInformation("Added {UserId} to whitelist by {AddedBy}", userId, addedBy);
+        
+        return entry;
+    }
+
+    public async Task UpdateWhitelistStatusAsync(string id, bool isActive)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+        
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "UPDATE Whitelist SET IsActive = @isActive WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@isActive", isActive ? 1 : 0);
+        
+        await cmd.ExecuteNonQueryAsync();
+        _logger.LogInformation("Updated whitelist status for {Id} to {IsActive}", id, isActive);
+    }
+
+    public async Task RemoveFromWhitelistAsync(string id)
+    {
+        using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+        
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM Whitelist WHERE Id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        
+        await cmd.ExecuteNonQueryAsync();
+        _logger.LogInformation("Removed {Id} from whitelist", id);
+    }
+
+    private WhitelistEntry MapWhitelistEntry(SqliteDataReader reader)
+    {
+        return new WhitelistEntry
+        {
+            Id = reader.GetString(0),
+            UserId = reader.GetString(1),
+            AddedBy = reader.GetString(2),
+            AddedAt = DateTime.Parse(reader.GetString(3)),
+            IsActive = reader.GetInt32(4) == 1,
+            WelcomeEmailSent = reader.GetInt32(5) == 1
+        };
+    }
 }
 
 public class DownloadJob
@@ -538,4 +679,15 @@ public class ArtistCount
 {
     public string Artist { get; set; } = "";
     public int Count { get; set; }
+}
+
+// Whitelist DTOs
+public class WhitelistEntry
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string UserId { get; set; } = string.Empty;
+    public string AddedBy { get; set; } = string.Empty;
+    public DateTime AddedAt { get; set; } = DateTime.UtcNow;
+    public bool IsActive { get; set; } = true;
+    public bool WelcomeEmailSent { get; set; } = false;
 }

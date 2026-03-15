@@ -174,6 +174,71 @@ public class DownloadApiService
             return null;
         }
     }
+
+    // ========== Whitelist Management Methods ==========
+
+    public async Task<List<WhitelistEntryDto>?> GetWhitelistAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("/api/admin/whitelist");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<List<WhitelistEntryDto>>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get whitelist");
+            return null;
+        }
+    }
+
+    public async Task<WhitelistEntryDto?> AddToWhitelistAsync(AddToWhitelistRequestDto request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/admin/whitelist", request);
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                throw new InvalidOperationException("User is already whitelisted");
+            }
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<WhitelistEntryDto>();
+        }
+        catch (Exception ex) when (ex is not InvalidOperationException)
+        {
+            _logger.LogError(ex, "Failed to add user to whitelist");
+            throw;
+        }
+    }
+
+    public async Task UpdateWhitelistStatusAsync(string id, bool isActive)
+    {
+        try
+        {
+            var request = new UpdateWhitelistRequestDto(IsActive: isActive);
+            var response = await _httpClient.PutAsJsonAsync($"/api/admin/whitelist/{id}", request);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update whitelist status");
+            throw;
+        }
+    }
+
+    public async Task RemoveFromWhitelistAsync(string id)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"/api/admin/whitelist/{id}");
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to remove user from whitelist");
+            throw;
+        }
+    }
 }
 
 // DTOs
@@ -277,3 +342,17 @@ public class ArtistCountDto
     public string Artist { get; set; } = "";
     public int Count { get; set; }
 }
+
+// Whitelist DTOs
+public class WhitelistEntryDto
+{
+    public string Id { get; set; } = "";
+    public string UserId { get; set; } = "";
+    public string AddedBy { get; set; } = "";
+    public DateTime AddedAt { get; set; }
+    public bool IsActive { get; set; }
+    public bool WelcomeEmailSent { get; set; }
+}
+
+public record AddToWhitelistRequestDto(string UserId, bool SendWelcomeEmail = false);
+public record UpdateWhitelistRequestDto(bool IsActive);
