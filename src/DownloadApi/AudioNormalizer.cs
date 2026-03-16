@@ -94,7 +94,8 @@ public class AudioNormalizer
         await process.WaitForExitAsync(ct);
 
         // Parse JSON from stderr (ffmpeg outputs loudnorm stats to stderr)
-        var jsonMatch = System.Text.RegularExpressions.Regex.Match(error, @"\{[^}]*\"input_i\"[^}]*\}");
+        var jsonPattern = "\\{[^}]*\"input_i\"[^}]*\\}";
+        var jsonMatch = System.Text.RegularExpressions.Regex.Match(error, jsonPattern);
         if (jsonMatch.Success)
         {
             try

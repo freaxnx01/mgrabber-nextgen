@@ -646,9 +646,8 @@ public record UserSettingsRequest(
     int NormalizationLevel,
     bool EmailNotifications
 );
-    
-    return Results.NoContent();
-});
+
+// Remove from whitelist (admin only)
 
 // Remove from whitelist (admin only)
 app.MapDelete("/api/admin/whitelist/{id}", async (string id, JobRepository repo) =>

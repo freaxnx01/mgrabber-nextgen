@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace Frontend.Services;
 
-public class DownloadApiService
+public partial class DownloadApiService
 {
     private readonly HttpClient _httpClient;
     private readonly IHttpContextAccessor _httpContextAccessor;

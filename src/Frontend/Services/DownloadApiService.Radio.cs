@@ -1,3 +1,7 @@
+namespace Frontend.Services;
+
+public partial class DownloadApiService
+{
     // ========== Radio Methods ==========
 
     public async Task<List<RadioStationDto>?> GetRadioStationsAsync()
@@ -72,5 +76,4 @@
             return null;
         }
     }
-
-    // ========== MusicBrainz Search Methods ==========
+}
