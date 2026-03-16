@@ -25,6 +25,9 @@ builder.Services.AddHttpClient<IMusicBrainzService, MusicBrainzService>();
 // Add email service
 builder.Services.AddTransient<IEmailService, SmtpEmailService>();
 
+// Add quota service
+builder.Services.AddScoped<IQuotaService, QuotaService>();
+
 // Add SQLite repository
 builder.Services.AddSingleton<JobRepository>(sp => 
 {
@@ -202,7 +205,7 @@ app.MapGet("/api/musicbrainz/artist/{artistId}", async (string artistId, IMusicB
 });
 
 // ========== Download Start ==========
-app.MapPost("/api/download/start", async (DownloadRequest request, JobRepository repo, IAudioExtractor extractor) =>
+app.MapPost("/api/download/start", async (DownloadRequest request, JobRepository repo, IAudioExtractor extractor, IQuotaService quotaService, IEmailService emailService) =>
 {
     if (string.IsNullOrWhiteSpace(request.Url) || string.IsNullOrWhiteSpace(request.UserId))
     {
@@ -214,6 +217,16 @@ app.MapPost("/api/download/start", async (DownloadRequest request, JobRepository
     if (format != "mp3")
     {
         return Results.BadRequest(new { Error = "Only MP3 format is supported in MVP" });
+    }
+
+    // Check quota before allowing download
+    var quota = await quotaService.GetUserQuotaAsync(request.UserId);
+    if (quota.Threshold == QuotaThreshold.Blocked)
+    {
+        return Results.Problem(
+            title: "Storage Quota Exceeded",
+            detail: $"Your storage is {quota.PercentageUsed:F0}% full. Please delete some files before downloading.",
+            statusCode: 403);
     }
 
     // Create job in database
@@ -228,13 +241,14 @@ app.MapPost("/api/download/start", async (DownloadRequest request, JobRepository
     // Start async extraction (fire and forget for MVP)
     _ = Task.Run(async () =>
     {
-        await ProcessDownloadAsync(job.Id, repo, extractor, builder.Services.BuildServiceProvider().GetRequiredService<AudioNormalizer>(), request.Normalize, request.NormalizationLevel);
+        await ProcessDownloadAsync(job.Id, repo, extractor, builder.Services.BuildServiceProvider().GetRequiredService<AudioNormalizer>(), quotaService, emailService, request.Normalize, request.NormalizationLevel);
     });
 
     return Results.Accepted($"/api/download/status/{job.Id}", new
     {
         JobId = job.Id,
         Status = job.Status.ToString(),
+        QuotaPercent = quota.PercentageUsed,
         Message = "Download started"
     });
 });
@@ -440,6 +454,42 @@ app.MapDelete("/api/admin/whitelist/{id}", async (string id, JobRepository repo)
     return Results.NoContent();
 });
 
+// ========== Quota Management ==========
+
+// Get user quota info
+app.MapGet("/api/quota/{userId}", async (string userId, IQuotaService quotaService) =>
+{
+    var quota = await quotaService.GetUserQuotaAsync(userId);
+    return Results.Ok(new
+    {
+        quota.UserId,
+        quota.TotalBytesAllowed,
+        quota.TotalBytesUsed,
+        quota.RemainingBytes,
+        quota.PercentageUsed,
+        quota.FileCount,
+        quota.Threshold,
+        UsedMB = quota.UsedMB,
+        TotalMB = quota.TotalMB,
+        RemainingMB = quota.RemainingMB
+    });
+});
+
+// Check if download would exceed quota
+app.MapGet("/api/quota/{userId}/check", async (string userId, long fileSizeBytes, IQuotaService quotaService) =>
+{
+    var wouldExceed = await quotaService.WouldExceedQuotaAsync(userId, fileSizeBytes);
+    var quota = await quotaService.GetUserQuotaAsync(userId);
+    
+    return Results.Ok(new
+    {
+        WouldExceed = wouldExceed,
+        CurrentUsage = quota.PercentageUsed,
+        RemainingMB = quota.RemainingMB,
+        Threshold = quota.Threshold
+    });
+});
+
 // Get specific user stats (admin only)
 app.MapGet("/api/admin/stats/users/{userId}", async (string userId, JobRepository repo) =>
 {
@@ -506,7 +556,7 @@ app.MapDelete("/api/files/{userId}/{jobId}", async (string userId, string jobId,
 });
 
 // Background download processor with retry logic
-async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtractor extractor, AudioNormalizer normalizer, bool normalize, double? normalizationLevel)
+async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtractor extractor, AudioNormalizer normalizer, IQuotaService quotaService, IEmailService emailService, bool normalize, double? normalizationLevel)
 {
     const int maxRetries = 3;
     
@@ -577,6 +627,17 @@ async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtracto
                     finalFilePath, 
                     finalFileSize
                 );
+                
+                // Check quota after successful download and send notification if needed
+                try
+                {
+                    await quotaService.CheckAndNotifyQuotaAsync(job.UserId);
+                }
+                catch (Exception quotaEx)
+                {
+                    _logger.LogError(quotaEx, "Failed to check quota after download for user {UserId}", job.UserId);
+                }
+                
                 return; // Success!
             }
             else
