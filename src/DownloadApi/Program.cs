@@ -344,15 +344,6 @@ app.MapPost("/api/playlist/download", async (PlaylistDownloadRequest request, Jo
     });
 });
 
-public record PlaylistDownloadRequest(
-    string PlaylistId,
-    string UserId,
-    List<string>? SelectedVideoIds,
-    string? Format,
-    bool Normalize,
-    double? NormalizationLevel
-);
-
 // ========== Download Start ==========
 app.MapPost("/api/download/start", async (DownloadRequest request, JobRepository repo, IAudioExtractor extractor, IQuotaService quotaService, IEmailService emailService) =>
 {
@@ -635,15 +626,6 @@ app.MapPut("/api/user/settings/{userId}", (string userId, UserSettingsRequest re
         Settings = request
     });
 });
-
-public record UserSettingsRequest(
-    string DefaultFormat,
-    bool EnableNormalization,
-    int NormalizationLevel,
-    bool EmailNotifications
-);
-
-// Remove from whitelist (admin only)
 
 // Remove from whitelist (admin only)
 app.MapDelete("/api/admin/whitelist/{id}", async (string id, JobRepository repo) =>
@@ -976,15 +958,6 @@ app.MapPost("/api/radio/download-current", async (
     }
 });
 
-public record RadioDownloadRequest(
-    string Station,
-    string? UserId,
-    string? Format,
-    bool AutoSelectBestMatch,
-    bool Normalize,
-    double? NormalizationLevel
-);
-
 // Background download processor with retry logic
 async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtractor extractor, AudioNormalizer normalizer, IQuotaService quotaService, IEmailService emailService, bool normalize, double? normalizationLevel)
 {
@@ -1106,4 +1079,29 @@ public record DownloadRequest(
     string? Author = null,
     bool Normalize = false,
     double? NormalizationLevel = null
+);
+
+public record PlaylistDownloadRequest(
+    string PlaylistId,
+    string UserId,
+    List<string>? SelectedVideoIds,
+    string? Format,
+    bool Normalize,
+    double? NormalizationLevel
+);
+
+public record UserSettingsRequest(
+    string DefaultFormat,
+    bool EnableNormalization,
+    int NormalizationLevel,
+    bool EmailNotifications
+);
+
+public record RadioDownloadRequest(
+    string Station,
+    string? UserId,
+    string? Format,
+    bool AutoSelectBestMatch,
+    bool Normalize,
+    double? NormalizationLevel
 );
