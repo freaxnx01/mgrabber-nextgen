@@ -435,8 +435,64 @@ app.MapPut("/api/admin/whitelist/{id}", async (string id, UpdateWhitelistRequest
     if (entry == null) return Results.NotFound(new { Error = "Entry not found" });
 
     await repo.UpdateWhitelistStatusAsync(id, request.IsActive);
-    
+
     _logger.LogInformation("Updated whitelist status for {UserId} to {IsActive}", entry.UserId, request.IsActive);
+
+    return Results.NoContent();
+});
+
+// ========== User Profile ==========
+
+// Get user profile
+app.MapGet("/api/user/profile/{userId}", async (string userId, JobRepository repo) =>
+{
+    var stats = await repo.GetUserDetailStatsAsync(userId);
+    if (stats == null)
+        return Results.NotFound(new { Error = "User not found" });
+
+    return Results.Ok(new
+    {
+        stats.UserId,
+        TotalDownloads = stats.TotalDownloads,
+        TotalStorageMB = Math.Round(stats.TotalStorageMB, 2),
+        stats.CompletedDownloads,
+        stats.FailedDownloads,
+        stats.LastActive,
+        stats.TopArtists,
+        stats.DownloadsPerDay
+    });
+});
+
+// Get user settings
+app.MapGet("/api/user/settings/{userId}", (string userId) =>
+{
+    // Return default settings (would be stored in DB in production)
+    return Results.Ok(new
+    {
+        DefaultFormat = "mp3",
+        EnableNormalization = false,
+        NormalizationLevel = -14,
+        EmailNotifications = true
+    });
+});
+
+// Update user settings
+app.MapPut("/api/user/settings/{userId}", (string userId, UserSettingsRequest request) =>
+{
+    // Update settings (would be stored in DB in production)
+    return Results.Ok(new
+    {
+        Message = "Settings updated successfully",
+        Settings = request
+    });
+});
+
+public record UserSettingsRequest(
+    string DefaultFormat,
+    bool EnableNormalization,
+    int NormalizationLevel,
+    bool EmailNotifications
+);
     
     return Results.NoContent();
 });

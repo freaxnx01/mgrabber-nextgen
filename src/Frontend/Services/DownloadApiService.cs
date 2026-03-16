@@ -240,6 +240,40 @@ public class DownloadApiService
         }
     }
 
+    // ========== Quota Methods ==========
+
+    public async Task<UserQuotaInfoDto?> GetUserQuotaAsync(string userId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/quota/{userId}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<UserQuotaInfoDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get user quota");
+            return null;
+        }
+    }
+
+    // ========== User Profile Methods ==========
+
+    public async Task<UserDetailStatsDto?> GetUserDetailStatsAsync(string userId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/admin/stats/users/{userId}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<UserDetailStatsDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get user detail stats");
+            return null;
+        }
+    }
+
     // ========== MusicBrainz Search Methods ==========
 
     public async Task<MusicBrainzSearchResultDto?> SearchMusicBrainzArtistsAsync(string query)
@@ -446,4 +480,45 @@ public class MusicBrainzReleaseDto
     public int? TrackCount { get; set; }
     public int? Score { get; set; }
     public string? Artist { get; set; }
+}
+
+// Quota DTOs
+public class UserQuotaInfoDto
+{
+    public string UserId { get; set; } = "";
+    public long TotalBytesAllowed { get; set; }
+    public long TotalBytesUsed { get; set; }
+    public double PercentageUsed { get; set; }
+    public long RemainingBytes { get; set; }
+    public int FileCount { get; set; }
+    public QuotaThreshold Threshold { get; set; }
+    public double UsedMB => TotalBytesUsed / (1024.0 * 1024.0);
+    public double TotalMB => TotalBytesAllowed / (1024.0 * 1024.0);
+    public double RemainingMB => RemainingBytes / (1024.0 * 1024.0);
+}
+
+public enum QuotaThreshold
+{
+    Normal,
+    Warning,
+    Critical,
+    Blocked
+}
+
+// User Profile DTOs
+public class UserProfileDto
+{
+    public string UserId { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Role { get; set; } = "";
+    public DateTime JoinedDate { get; set; }
+}
+
+public class UserSettingsDto
+{
+    public string DefaultFormat { get; set; } = "mp3";
+    public bool EnableNormalization { get; set; }
+    public int NormalizationLevel { get; set; } = -14;
+    public bool EmailNotifications { get; set; } = true;
 }

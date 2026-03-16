@@ -1,0 +1,357 @@
+@page "/profile"
+@using Frontend.Services
+@inject DownloadApiService DownloadApi
+@inject ILogger<Profile> Logger
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>My Profile - Music Grabber</PageTitle>
+
+<div class="container">
+    <h1>👤 My Profile</h1>
+    
+    @if (IsLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (UserProfile != null)
+    {
+        <div class="row">
+            <!-- Profile Card -->
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Account Info</h5>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <span style="font-size: 4rem;">👤</span>
+                        </div>
+                        <h5>@UserProfile.Name</h5>
+                        <p class="text-muted">@UserProfile.Email</p>
+                        <p><span class="badge bg-primary">@UserProfile.Role</span></p>
+                        <p class="text-muted small">Member since @UserProfile.JoinedDate.ToString("yyyy-MM-dd")</p>
+                    </div>
+                </div>
+                
+                <!-- Storage Card -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Storage</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (QuotaInfo != null)
+                        {
+                            <div class="text-center mb-3">
+                                <h3>@QuotaInfo.PercentageUsed.ToString("F0")%</h3>
+                                <p class="text-muted">@QuotaInfo.UsedMB.ToString("F1") MB / @QuotaInfo.TotalMB.ToString("F0") MB</p>
+                            </div>
+                            
+                            <div class="progress mb-3" style="height: 20px;">
+                                <div class="progress-bar @GetProgressBarColor(QuotaInfo.PercentageUsed)" 
+                                     role="progressbar" 
+                                     style="width: @Math.Min(QuotaInfo.PercentageUsed, 100)%"
+                                     aria-valuenow="@QuotaInfo.PercentageUsed" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                </div>
+                            </div>
+                            
+                            <p class="text-muted small">@QuotaInfo.FileCount files stored</p>
+                            <p class="text-muted small">@QuotaInfo.RemainingMB.ToString("F1") MB remaining</p>
+                            
+                            @if (QuotaInfo.Threshold != QuotaThreshold.Normal)
+                            {
+                                <div class="alert @GetAlertClass(QuotaInfo.Threshold) mt-3">
+                                    <strong>⚠️ @GetThresholdMessage(QuotaInfo.Threshold)</strong>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">Unable to load quota information.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stats and Activity -->
+            <div class="col-md-8">
+                <!-- Stats Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <h3>@UserStats?.TotalDownloads.ToString() ?? "0"</h3>
+                                <p class="mb-0">Total Downloads</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h3>@UserStats?.CompletedDownloads.ToString() ?? "0"</h3>
+                                <p class="mb-0">Completed</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <h3>@(UserStats?.LastActive?.ToString("yyyy-MM-dd") ?? "Never")</h3>
+                                <p class="mb-0">Last Active</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>⚙️ Default Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <form @onsubmit="SaveSettingsAsync">
+                            <div class="mb-3">
+                                <label class="form-label">Default Format</label>
+                                <select class="form-select" @bind="UserSettings.DefaultFormat">
+                                    <option value="mp3">MP3 (Compressed)</option>
+                                    <option value="flac">FLAC (Lossless)</option>
+                                    <option value="m4a">M4A (AAC)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="UserSettings.EnableNormalization" id="normalization">
+                                    <label class="form-check-label" for="normalization">
+                                        Enable Volume Normalization
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            @if (UserSettings.EnableNormalization)
+                            {
+                                <div class="mb-3">
+                                    <label class="form-label">Target Loudness: @UserSettings.NormalizationLevel LUFS</label>
+                                    <input type="range" class="form-range" min="-20" max="-10" step="1" 
+                                           @bind="UserSettings.NormalizationLevel">
+                                    <small class="text-muted">-14 LUFS is standard for streaming</small>
+                                </div>
+                            }
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="UserSettings.EmailNotifications" id="emailNotif">
+                                    <label class="form-check-label" for="emailNotif">
+                                        Receive Email Notifications
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary" disabled="@IsSavingSettings">
+                                @if (IsSavingSettings)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                Save Settings
+                            </button>
+                            
+                            @if (!string.IsNullOrEmpty(SettingsMessage))
+                            {
+                                <span class="ms-2 @SettingsMessageClass">@SettingsMessage</span>
+                            }
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📊 Recent Activity</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (UserStats?.TopArtists?.Any() == true)
+                        {
+                            <h6>Top Artists</h6>
+                            <div class="list-group list-group-flush mb-3">
+                                @foreach (var artist in UserStats.TopArtists.Take(5))
+                                {
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>@artist.Artist</span>
+                                        <span class="badge bg-primary">@artist.Count downloads</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        
+                        @if (UserStats?.DownloadsPerDay?.Any() == true)
+                        {
+                            <h6>Downloads (Last 30 Days)</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Downloads</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var day in UserStats.DownloadsPerDay.Take(7))
+                                        {
+                                            <tr>
+                                                <td>@day.Date</td>
+                                                <td>@day.Count</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-danger">
+            Failed to load profile. Please try again later.
+        </div>
+    }
+</div>
+
+@code {
+    private bool IsLoading = true;
+    private bool IsSavingSettings = false;
+    private UserProfileDto? UserProfile;
+    private UserDetailStatsDto? UserStats;
+    private UserQuotaInfoDto? QuotaInfo;
+    private UserSettingsDto UserSettings = new();
+    private string? SettingsMessage;
+    private string SettingsMessageClass = "text-success";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        try
+        {
+            // TODO: Get current user ID from authentication context
+            var userId = "dev-user"; // Placeholder - should come from auth
+            
+            // Load user stats
+            UserStats = await DownloadApi.GetUserDetailStatsAsync(userId);
+            
+            // Load quota info
+            QuotaInfo = await DownloadApi.GetUserQuotaAsync(userId);
+            
+            // Mock profile for now
+            UserProfile = new UserProfileDto
+            {
+                Email = userId,
+                Name = "Dev User",
+                Role = "Admin",
+                JoinedDate = DateTime.Now.AddMonths(-1)
+            };
+            
+            // Load settings (would come from API in production)
+            UserSettings = new UserSettingsDto
+            {
+                DefaultFormat = "mp3",
+                EnableNormalization = false,
+                NormalizationLevel = -14,
+                EmailNotifications = true
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load profile");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        IsSavingSettings = true;
+        SettingsMessage = null;
+        
+        try
+        {
+            // TODO: Save settings to API
+            await Task.Delay(500); // Simulate API call
+            
+            SettingsMessage = "Settings saved!";
+            SettingsMessageClass = "text-success";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save settings");
+            SettingsMessage = "Failed to save settings.";
+            SettingsMessageClass = "text-danger";
+        }
+        finally
+        {
+            IsSavingSettings = false;
+        }
+    }
+
+    private string GetProgressBarColor(double percentage)
+    {
+        return percentage switch
+        {
+            >= 95 => "bg-danger",
+            >= 80 => "bg-warning",
+            _ => "bg-success"
+        };
+    }
+
+    private string GetAlertClass(QuotaThreshold threshold)
+    {
+        return threshold switch
+        {
+            QuotaThreshold.Blocked => "alert-danger",
+            QuotaThreshold.Critical => "alert-warning",
+            QuotaThreshold.Warning => "alert-info",
+            _ => "alert-success"
+        };
+    }
+
+    private string GetThresholdMessage(QuotaThreshold threshold)
+    {
+        return threshold switch
+        {
+            QuotaThreshold.Blocked => "Downloads blocked - storage full!",
+            QuotaThreshold.Critical => "Storage almost full!",
+            QuotaThreshold.Warning => "Storage getting full.",
+            _ => ""
+        };
+    }
+
+    // DTOs
+    private class UserProfileDto
+    {
+        public string Email { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Role { get; set; } = "";
+        public DateTime JoinedDate { get; set; }
+    }
+
+    private class UserSettingsDto
+    {
+        public string DefaultFormat { get; set; } = "mp3";
+        public bool EnableNormalization { get; set; }
+        public int NormalizationLevel { get; set; } = -14;
+        public bool EmailNotifications { get; set; } = true;
+    }
+}
