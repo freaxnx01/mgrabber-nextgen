@@ -2,10 +2,6 @@ using DownloadApi;
 using DownloadApi.Data;
 using DownloadApi.Services;
 
-// Request DTOs
-public record AddToWhitelistRequest(string UserId, bool SendWelcomeEmail = false);
-public record UpdateWhitelistRequest(bool IsActive);
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services
@@ -1099,6 +1095,9 @@ async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtracto
 app.Run();
 
 // DTOs
+public record AddToWhitelistRequest(string UserId, bool SendWelcomeEmail = false);
+public record UpdateWhitelistRequest(bool IsActive);
+
 public record DownloadRequest(
     string Url,
     string UserId,
