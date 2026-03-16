@@ -19,6 +19,9 @@ builder.Services.AddMemoryCache();
 // Add HTTP client for YouTube API
 builder.Services.AddHttpClient<IYouTubeSearchService, YouTubeSearchService>();
 
+// Add HTTP client for YouTube Playlist API
+builder.Services.AddHttpClient<IPlaylistService, YouTubePlaylistService>();
+
 // Add HTTP client for MusicBrainz API
 builder.Services.AddHttpClient<IMusicBrainzService, MusicBrainzService>();
 
@@ -203,6 +206,153 @@ app.MapGet("/api/musicbrainz/artist/{artistId}", async (string artistId, IMusicB
             statusCode: 500);
     }
 });
+
+// ========== YouTube Playlist ==========
+
+// Get playlist info
+app.MapGet("/api/playlist/info", async (string url, IPlaylistService playlistService) =>
+{
+    if (string.IsNullOrWhiteSpace(url))
+    {
+        return Results.BadRequest(new { Error = "Playlist URL is required" });
+    }
+
+    try
+    {
+        var playlist = await playlistService.GetPlaylistInfoAsync(url);
+        return Results.Ok(new
+        {
+            playlist.Id,
+            playlist.Title,
+            playlist.Description,
+            playlist.Author,
+            playlist.ThumbnailUrl,
+            playlist.VideoCount,
+            playlist.PublishedAt
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { Error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to get playlist info");
+        return Results.Problem(
+            title: "Playlist Error",
+            detail: "Failed to retrieve playlist information.",
+            statusCode: 500);
+    }
+});
+
+// Get playlist videos
+app.MapGet("/api/playlist/videos", async (string playlistId, IPlaylistService playlistService) =>
+{
+    if (string.IsNullOrWhiteSpace(playlistId))
+    {
+        return Results.BadRequest(new { Error = "Playlist ID is required" });
+    }
+
+    try
+    {
+        var videos = await playlistService.GetPlaylistVideosAsync(playlistId);
+        return Results.Ok(new
+        {
+            PlaylistId = playlistId,
+            TotalVideos = videos.Count,
+            Videos = videos.Select(v => new
+            {
+                v.Position,
+                v.VideoId,
+                v.Title,
+                v.Author,
+                v.ThumbnailUrl,
+                v.PublishedAt
+            })
+        });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to get playlist videos");
+        return Results.Problem(
+            title: "Playlist Error",
+            detail: "Failed to retrieve playlist videos.",
+            statusCode: 500);
+    }
+});
+
+// Start playlist download
+app.MapPost("/api/playlist/download", async (PlaylistDownloadRequest request, JobRepository repo, IAudioExtractor extractor, IQuotaService quotaService, IEmailService emailService) =>
+{
+    if (string.IsNullOrWhiteSpace(request.PlaylistId) || string.IsNullOrWhiteSpace(request.UserId))
+    {
+        return Results.BadRequest(new { Error = "PlaylistId and UserId are required" });
+    }
+
+    // Get playlist videos
+    var playlistService = app.Services.GetRequiredService<IPlaylistService>();
+    var videos = await playlistService.GetPlaylistVideosAsync(request.PlaylistId);
+
+    if (!videos.Any())
+    {
+        return Results.BadRequest(new { Error = "No videos found in playlist" });
+    }
+
+    // Filter selected videos if specified
+    var videosToDownload = request.SelectedVideoIds?.Any() == true
+        ? videos.Where(v => request.SelectedVideoIds.Contains(v.VideoId)).ToList()
+        : videos;
+
+    // Check quota for all videos (estimate 10MB per video)
+    var estimatedTotalBytes = videosToDownload.Count * 10L * 1024 * 1024; // 10MB estimate
+    var wouldExceed = await quotaService.WouldExceedQuotaAsync(request.UserId, estimatedTotalBytes);
+    
+    if (wouldExceed)
+    {
+        var quota = await quotaService.GetUserQuotaAsync(request.UserId);
+        return Results.Problem(
+            title: "Storage Quota Warning",
+            detail = $"This playlist download may exceed your storage quota. You have {quota.RemainingMB:F0} MB remaining.",
+            statusCode: 403);
+    }
+
+    // Create jobs for each video
+    var jobs = new List<object>();
+    foreach (var video in videosToDownload)
+    {
+        var job = await repo.CreateJobAsync(
+            request.UserId,
+            $"https://youtube.com/watch?v={video.VideoId}",
+            request.Format?.ToLower() ?? "mp3",
+            video.Title,
+            video.Author
+        );
+
+        // Start async download
+        _ = Task.Run(async () =>
+        {
+            await ProcessDownloadAsync(job.Id, repo, extractor, app.Services.GetRequiredService<AudioNormalizer>(), quotaService, emailService, request.Normalize, request.NormalizationLevel);
+        });
+
+        jobs.Add(new { job.Id, job.Title, job.Status });
+    }
+
+    return Results.Accepted("/api/jobs", new
+    {
+        Message = $"Started downloading {jobs.Count} videos from playlist",
+        TotalVideos = videosToDownload.Count,
+        Jobs = jobs
+    });
+});
+
+public record PlaylistDownloadRequest(
+    string PlaylistId,
+    string UserId,
+    List<string>? SelectedVideoIds,
+    string? Format,
+    bool Normalize,
+    double? NormalizationLevel
+);
 
 // ========== Download Start ==========
 app.MapPost("/api/download/start", async (DownloadRequest request, JobRepository repo, IAudioExtractor extractor, IQuotaService quotaService, IEmailService emailService) =>

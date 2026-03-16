@@ -274,6 +274,68 @@ public class DownloadApiService
         }
     }
 
+    // ========== Playlist Methods ==========
+
+    public async Task<PlaylistInfoDto?> GetPlaylistInfoAsync(string url)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/playlist/info?url={Uri.EscapeDataString(url)}");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<PlaylistInfoDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get playlist info");
+            return null;
+        }
+    }
+
+    public async Task<List<PlaylistVideoDto>?> GetPlaylistVideosAsync(string playlistId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/playlist/videos?playlistId={Uri.EscapeDataString(playlistId)}");
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadFromJsonAsync<PlaylistVideosResponseDto>();
+            return result?.Videos?.ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get playlist videos");
+            return null;
+        }
+    }
+
+    public async Task<PlaylistDownloadResultDto?> StartPlaylistDownloadAsync(
+        string playlistId,
+        string userId,
+        List<string> selectedVideoIds,
+        string format,
+        bool normalize)
+    {
+        try
+        {
+            var request = new
+            {
+                PlaylistId = playlistId,
+                UserId = userId,
+                SelectedVideoIds = selectedVideoIds,
+                Format = format,
+                Normalize = normalize
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("/api/playlist/download", request);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<PlaylistDownloadResultDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start playlist download");
+            return null;
+        }
+    }
+
     // ========== MusicBrainz Search Methods ==========
 
     public async Task<MusicBrainzSearchResultDto?> SearchMusicBrainzArtistsAsync(string query)
@@ -521,4 +583,40 @@ public class UserSettingsDto
     public bool EnableNormalization { get; set; }
     public int NormalizationLevel { get; set; } = -14;
     public bool EmailNotifications { get; set; } = true;
+}
+
+// Playlist DTOs
+public class PlaylistInfoDto
+{
+    public string Id { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Author { get; set; } = "";
+    public string ThumbnailUrl { get; set; } = "";
+    public int VideoCount { get; set; }
+    public string? PublishedAt { get; set; }
+}
+
+public class PlaylistVideoDto
+{
+    public int Position { get; set; }
+    public string VideoId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Author { get; set; } = "";
+    public string ThumbnailUrl { get; set; } = "";
+    public string? PublishedAt { get; set; }
+}
+
+public class PlaylistVideosResponseDto
+{
+    public string PlaylistId { get; set; } = "";
+    public int TotalVideos { get; set; }
+    public List<PlaylistVideoDto> Videos { get; set; } = new();
+}
+
+public class PlaylistDownloadResultDto
+{
+    public string Message { get; set; } = "";
+    public int TotalVideos { get; set; }
+    public List<object> Jobs { get; set; } = new();
 }

@@ -1,0 +1,443 @@
+@page "/playlist"
+@using Frontend.Services
+@inject DownloadApiService DownloadApi
+@inject NavigationManager Navigation
+@inject ILogger<PlaylistDownload> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Playlist Download - Music Grabber</PageTitle>
+
+<div class="container">
+    <h1>📋 Playlist Download</h1>
+    <p class="text-muted">Download entire YouTube playlists</p>
+
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="alert @MessageClass" role="alert">
+            @Message
+        </div>
+    }
+
+    <!-- Playlist URL Input -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Enter Playlist URL</h5>
+        </div>
+        <div class="card-body">
+            <div class="input-group mb-3">
+                <input type="url" class="form-control" 
+                       @bind="PlaylistUrl" 
+                       placeholder="https://youtube.com/playlist?list=..."
+                       @onkeypress="HandleKeyPress" />
+                <button class="btn btn-primary" @onclick="LoadPlaylistAsync" disabled="@IsLoading">
+                    @if (IsLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Load Playlist
+                </button>
+            </div>
+            <small class="text-muted">
+                Supports: youtube.com/playlist?list=PLAYLIST_ID
+            </small>
+        </div>
+    </div>
+
+    <!-- Playlist Info -->
+    @if (PlaylistInfo != null)
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">@PlaylistInfo.Title</h5>
+                    <small class="text-muted">by @PlaylistInfo.Author • @PlaylistInfo.VideoCount videos</small>
+                </div>
+                <img src="@PlaylistInfo.ThumbnailUrl" alt="" style="width: 120px; height: 68px; object-fit: cover;" class="rounded" />
+            </div>
+            <div class="card-body">
+                <!-- Download Options -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <label class="form-label">Format</label>
+                        <select class="form-select" @bind="DownloadOptions.Format">
+                            <option value="mp3">MP3</option>
+                            <option value="flac">FLAC</option>
+                            <option value="m4a">M4A</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" @bind="DownloadOptions.Normalize" id="normalize">
+                            <label class="form-check-label" for="normalize">
+                                Normalize Audio
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Action</label>
+                        <div>
+                            <button class="btn btn-success me-2" @onclick="DownloadAllAsync" disabled="@IsDownloading">
+                                @if (IsDownloading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                ⬇️ Download All (@SelectedVideos.Count selected)
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="SelectAll">
+                                Select All
+                            </button>
+                            <button class="btn btn-outline-secondary" @onclick="DeselectAll">
+                                Deselect All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quota Warning -->
+                @if (QuotaInfo != null)
+                {
+                    <div class="alert @GetQuotaAlertClass() mb-4">
+                        <strong>Storage:</strong> @QuotaInfo.PercentageUsed.ToString("F0")% used 
+                        (@QuotaInfo.UsedMB.ToString("F0") MB / @QuotaInfo.TotalMB.ToString("F0") MB)
+                        <br>
+                        <small>Estimated space needed: @((SelectedVideos.Count * 10).ToString("F0")) MB</small>
+                    </div>
+                }
+
+                <!-- Videos List -->
+                <h6>Videos (@Videos.Count)</h6>
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" class="form-check-input" 
+                                           checked="@AreAllSelected"
+                                           @onchange="ToggleSelectAll" />
+                                </th>
+                                <th style="width: 60px;">#</th>
+                                <th style="width: 120px;">Thumbnail</th>
+                                <th>Title</th>
+                                <th>Channel</th>
+                                <th style="width: 100px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var video in Videos)
+                            {
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input" 
+                                               checked="@SelectedVideos.Contains(video.VideoId)"
+                                               @onchange="() => ToggleVideoSelection(video.VideoId)" />
+                                    </td>
+                                    <td>@(video.Position + 1)</td>
+                                    <td>
+                                        <img src="@video.ThumbnailUrl" alt="" style="width: 100px; height: 56px; object-fit: cover;" />
+                                    </td>
+                                    <td>
+                                        <div class="text-truncate" style="max-width: 300px;" title="@video.Title">
+                                            @video.Title
+                                        </div>
+                                    </td>
+                                    <td>@video.Author</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success" @onclick="() => DownloadSingleAsync(video)">
+                                            ⬇️
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Download Progress -->
+    @if (DownloadJobs.Any())
+    {
+        <div class="card">
+            <div class="card-header">
+                <h5>Download Progress</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    @foreach (var job in DownloadJobs)
+                    {
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">@job.Title</h6>
+                                <small class="text-muted">@job.Status</small>
+                            </div>
+                            <div class="d-flex align-items-center" style="width: 200px;">
+                                <div class="progress flex-grow-1 me-2" style="height: 20px;">
+                                    <div class="progress-bar @GetJobProgressClass(job.Status)" 
+                                         role="progressbar" 
+                                         style="width: @job.Progress%"
+                                         aria-valuenow="@job.Progress" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                        @job.Progress%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string PlaylistUrl = "";
+    private bool IsLoading = false;
+    private bool IsDownloading = false;
+    private PlaylistInfoDto? PlaylistInfo;
+    private List<PlaylistVideoDto> Videos = new();
+    private List<string> SelectedVideos = new();
+    private UserQuotaInfoDto? QuotaInfo;
+    private List<DownloadJobDto> DownloadJobs = new();
+    private string? Message;
+    private string MessageClass = "alert-info";
+
+    private DownloadOptionsDto DownloadOptions = new()
+    {
+        Format = "mp3",
+        Normalize = false
+    };
+
+    private bool AreAllSelected => Videos.Any() && SelectedVideos.Count == Videos.Count;
+
+    private async Task LoadPlaylistAsync()
+    {
+        if (string.IsNullOrWhiteSpace(PlaylistUrl))
+        {
+            ShowError("Please enter a playlist URL.");
+            return;
+        }
+
+        IsLoading = true;
+        Videos.Clear();
+        SelectedVideos.Clear();
+
+        try
+        {
+            // Load playlist info
+            PlaylistInfo = await DownloadApi.GetPlaylistInfoAsync(PlaylistUrl);
+            
+            if (PlaylistInfo == null)
+            {
+                ShowError("Failed to load playlist. Please check the URL.");
+                return;
+            }
+
+            // Load videos
+            var videosResult = await DownloadApi.GetPlaylistVideosAsync(PlaylistInfo.Id);
+            if (videosResult != null)
+            {
+                Videos = videosResult.ToList();
+                SelectedVideos = Videos.Select(v => v.VideoId).ToList();
+            }
+
+            // Load quota info
+            var userId = "dev-user"; // TODO: Get from auth
+            QuotaInfo = await DownloadApi.GetUserQuotaAsync(userId);
+
+            ShowSuccess($"Loaded {Videos.Count} videos from playlist.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load playlist");
+            ShowError("Failed to load playlist. Please try again.");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task DownloadAllAsync()
+    {
+        if (!SelectedVideos.Any())
+        {
+            ShowError("Please select at least one video.");
+            return;
+        }
+
+        IsDownloading = true;
+
+        try
+        {
+            var result = await DownloadApi.StartPlaylistDownloadAsync(
+                PlaylistInfo!.Id,
+                "dev-user", // TODO: Get from auth
+                SelectedVideos,
+                DownloadOptions.Format,
+                DownloadOptions.Normalize
+            );
+
+            if (result != null)
+            {
+                ShowSuccess($"Started downloading {SelectedVideos.Count} videos!");
+                // Start polling for progress
+                _ = Task.Run(async () => await PollDownloadProgress());
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to start playlist download");
+            ShowError("Failed to start download. Please try again.");
+        }
+        finally
+        {
+            IsDownloading = false;
+        }
+    }
+
+    private async Task DownloadSingleAsync(PlaylistVideoDto video)
+    {
+        try
+        {
+            var result = await DownloadApi.StartDownloadAsync(
+                $"https://youtube.com/watch?v={video.VideoId}",
+                video.Title,
+                video.Author
+            );
+
+            if (result != null)
+            {
+                ShowSuccess($"Started downloading: {video.Title}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to download video");
+            ShowError("Failed to start download.");
+        }
+    }
+
+    private async Task PollDownloadProgress()
+    {
+        // Poll for download progress
+        while (DownloadJobs.Any(j => j.Status != "Completed" && j.Status != "Failed"))
+        {
+            await Task.Delay(5000);
+            // TODO: Update job progress from API
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ToggleVideoSelection(string videoId)
+    {
+        if (SelectedVideos.Contains(videoId))
+        {
+            SelectedVideos.Remove(videoId);
+        }
+        else
+        {
+            SelectedVideos.Add(videoId);
+        }
+    }
+
+    private void ToggleSelectAll()
+    {
+        if (AreAllSelected)
+        {
+            DeselectAll();
+        }
+        else
+        {
+            SelectAll();
+        }
+    }
+
+    private void SelectAll()
+    {
+        SelectedVideos = Videos.Select(v => v.VideoId).ToList();
+    }
+
+    private void DeselectAll()
+    {
+        SelectedVideos.Clear();
+    }
+
+    private string GetQuotaAlertClass()
+    {
+        if (QuotaInfo == null) return "alert-info";
+        return QuotaInfo.PercentageUsed switch
+        {
+            >= 95 => "alert-danger",
+            >= 80 => "alert-warning",
+            _ => "alert-info"
+        };
+    }
+
+    private string GetJobProgressClass(string status)
+    {
+        return status switch
+        {
+            "Completed" => "bg-success",
+            "Failed" => "bg-danger",
+            "Pending" => "bg-secondary",
+            _ => "bg-primary"
+        };
+    }
+
+    private void ShowSuccess(string message)
+    {
+        Message = message;
+        MessageClass = "alert-success";
+        StateHasChanged();
+    }
+
+    private void ShowError(string message)
+    {
+        Message = message;
+        MessageClass = "alert-danger";
+        StateHasChanged();
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadPlaylistAsync();
+        }
+    }
+
+    // DTOs
+    private class PlaylistInfoDto
+    {
+        public string Id { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Author { get; set; } = "";
+        public string ThumbnailUrl { get; set; } = "";
+        public int VideoCount { get; set; }
+    }
+
+    private class PlaylistVideoDto
+    {
+        public int Position { get; set; }
+        public string VideoId { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Author { get; set; } = "";
+        public string ThumbnailUrl { get; set; } = "";
+    }
+
+    private class DownloadOptionsDto
+    {
+        public string Format { get; set; } = "mp3";
+        public bool Normalize { get; set; }
+    }
+
+    private class DownloadJobDto
+    {
+        public string Id { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Status { get; set; } = "";
+        public int Progress { get; set; }
+    }
+}
