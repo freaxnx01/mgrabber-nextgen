@@ -1,4 +1,15 @@
 
+namespace Frontend.Services;
+
+// YouTube video result for radio search
+public class YouTubeVideoDto
+{
+    public string VideoId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Author { get; set; } = "";
+    public string Duration { get; set; } = "";
+    public string ThumbnailUrl { get; set; } = "";
+}
 
 // Radio DTOs
 public class RadioStationDto

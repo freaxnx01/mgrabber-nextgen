@@ -257,23 +257,6 @@ public partial class DownloadApiService
         }
     }
 
-    // ========== User Profile Methods ==========
-
-    public async Task<UserDetailStatsDto?> GetUserDetailStatsAsync(string userId)
-    {
-        try
-        {
-            var response = await _httpClient.GetAsync($"/api/admin/stats/users/{userId}");
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<UserDetailStatsDto>();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to get user detail stats");
-            return null;
-        }
-    }
-
     // ========== Playlist Methods ==========
 
     public async Task<PlaylistInfoDto?> GetPlaylistInfoAsync(string url)

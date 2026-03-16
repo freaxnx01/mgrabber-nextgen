@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Web;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace DownloadApi.Services;
 

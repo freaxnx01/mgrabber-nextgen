@@ -1,3 +1,5 @@
+using DownloadApi.Data;
+
 namespace DownloadApi.Services;
 
 public interface IQuotaService
