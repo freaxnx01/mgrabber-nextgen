@@ -25,6 +25,9 @@ builder.Services.AddHttpClient<IPlaylistService, YouTubePlaylistService>();
 // Add HTTP client for MusicBrainz API
 builder.Services.AddHttpClient<IMusicBrainzService, MusicBrainzService>();
 
+// Add HTTP client for Radio API (SRG SSR)
+builder.Services.AddHttpClient<IRadioService, SrgSsrRadioService>();
+
 // Add email service
 builder.Services.AddTransient<IEmailService, SmtpEmailService>();
 
@@ -760,6 +763,232 @@ app.MapDelete("/api/files/{userId}/{jobId}", async (string userId, string jobId,
     
     return Results.Ok(new { Message = "File deleted successfully" });
 });
+
+// ========== Radio Now Playing ==========
+
+// Get available radio stations
+app.MapGet("/api/radio/stations", async (IRadioService radioService) =>
+{
+    try
+    {
+        var stations = await radioService.GetStationsAsync();
+        return Results.Ok(new
+        {
+            Stations = stations.Select(s => new
+            {
+                s.Id,
+                s.Name,
+                s.Provider
+            })
+        });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to get radio stations");
+        return Results.Problem("Failed to retrieve radio stations", statusCode: 500);
+    }
+});
+
+// Get current playlist for a station
+app.MapGet("/api/radio/playlist", async (string station, int? limit, IRadioService radioService) =>
+{
+    if (string.IsNullOrWhiteSpace(station))
+    {
+        return Results.BadRequest(new { Error = "Station parameter is required" });
+    }
+
+    try
+    {
+        var playlist = await radioService.GetPlaylistAsync(station, limit ?? 20);
+        var nowPlaying = playlist.FirstOrDefault(s => s.IsPlayingNow);
+        
+        return Results.Ok(new
+        {
+            Station = station,
+            NowPlaying = nowPlaying != null ? new
+            {
+                nowPlaying.Artist,
+                nowPlaying.Title,
+                nowPlaying.FormattedDuration,
+                nowPlaying.IsPlayingNow
+            } : null,
+            Songs = playlist.Select(s => new
+            {
+                s.Artist,
+                s.Title,
+                s.PlayedAt,
+                s.FormattedDuration,
+                s.IsPlayingNow,
+                s.SearchQuery
+            })
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { Error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to get radio playlist for {Station}", station);
+        return Results.Problem("Failed to retrieve playlist", statusCode: 500);
+    }
+});
+
+// Get currently playing song
+app.MapGet("/api/radio/now-playing", async (string station, IRadioService radioService) =>
+{
+    if (string.IsNullOrWhiteSpace(station))
+    {
+        return Results.BadRequest(new { Error = "Station parameter is required" });
+    }
+
+    try
+    {
+        var song = await radioService.GetNowPlayingAsync(station);
+        if (song == null)
+        {
+            return Results.NotFound(new { Error = "No song currently playing or station not found" });
+        }
+
+        return Results.Ok(new
+        {
+            song.Artist,
+            song.Title,
+            song.PlayedAt,
+            song.FormattedDuration,
+            song.IsPlayingNow,
+            song.Station,
+            song.StationName,
+            song.SearchQuery
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { Error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to get now playing for {Station}", station);
+        return Results.Problem("Failed to retrieve now playing", statusCode: 500);
+    }
+});
+
+// Download currently playing song (Agent API)
+app.MapPost("/api/radio/download-current", async (
+    RadioDownloadRequest request,
+    IRadioService radioService,
+    IYouTubeSearchService youTubeService,
+    IQuotaService quotaService,
+    JobRepository repo,
+    IAudioExtractor extractor) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Station))
+    {
+        return Results.BadRequest(new { Error = "Station is required" });
+    }
+
+    try
+    {
+        // Get currently playing song
+        var song = await radioService.GetNowPlayingAsync(request.Station);
+        if (song == null)
+        {
+            return Results.NotFound(new { Error = $"No song currently playing on {request.Station}" });
+        }
+
+        // Check quota
+        var userId = request.UserId ?? "agent-user";
+        var quota = await quotaService.GetUserQuotaAsync(userId);
+        if (quota.Threshold == QuotaThreshold.Blocked)
+        {
+            return Results.Problem(
+                title: "Storage Quota Exceeded",
+                detail: $"Storage is {quota.PercentageUsed:F0}% full. Please free up space.",
+                statusCode: 429);
+        }
+
+        // Search YouTube
+        var searchResult = await youTubeService.SearchAsync(song.SearchQuery, 5);
+        if (searchResult?.Results?.Any() != true)
+        {
+            return Results.NotFound(new { Error = "No YouTube results found for this song" });
+        }
+
+        // Select best match
+        var bestMatch = request.AutoSelectBestMatch 
+            ? searchResult.Results.First() 
+            : null;
+
+        if (bestMatch == null)
+        {
+            return Results.Ok(new
+            {
+                Song = new { song.Artist, song.Title, song.Station, song.PlayedAt },
+                YouTubeResults = searchResult.Results.Select(r => new
+                {
+                    r.VideoId,
+                    r.Title,
+                    r.Author,
+                    r.Duration,
+                    r.ThumbnailUrl
+                }),
+                Message = "Multiple matches found. Please select one."
+            });
+        }
+
+        // Create download job
+        var format = request.Format?.ToLower() ?? "mp3";
+        var job = await repo.CreateJobAsync(
+            userId,
+            $"https://youtube.com/watch?v={bestMatch.VideoId}",
+            format,
+            $"{song.Artist} - {song.Title}",
+            song.Artist
+        );
+
+        // Start download
+        _ = Task.Run(async () =>
+        {
+            await ProcessDownloadAsync(job.Id, repo, extractor, 
+                app.Services.GetRequiredService<AudioNormalizer>(),
+                quotaService,
+                app.Services.GetRequiredService<IEmailService>(),
+                request.Normalize, 
+                request.NormalizationLevel);
+        });
+
+        return Results.Accepted("/api/download/status/" + job.Id, new
+        {
+            Success = true,
+            Song = new { song.Artist, song.Title, song.Station, song.PlayedAt },
+            Download = new
+            {
+                job.Id,
+                Status = "queued",
+                YouTubeUrl = $"https://youtube.com/watch?v={bestMatch.VideoId}",
+                YouTubeTitle = bestMatch.Title
+            }
+        });
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(new { Error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Failed to download current song from {Station}", request.Station);
+        return Results.Problem("Failed to process download request", statusCode: 500);
+    }
+});
+
+public record RadioDownloadRequest(
+    string Station,
+    string? UserId,
+    string? Format,
+    bool AutoSelectBestMatch,
+    bool Normalize,
+    double? NormalizationLevel
+);
 
 // Background download processor with retry logic
 async Task ProcessDownloadAsync(string jobId, JobRepository repo, IAudioExtractor extractor, AudioNormalizer normalizer, IQuotaService quotaService, IEmailService emailService, bool normalize, double? normalizationLevel)
