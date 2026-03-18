@@ -2,7 +2,7 @@
 @using Frontend.Services
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin,SuperAdmin")]
-@inject DownloadApiService DownloadApi
+@inject IDownloadApiService DownloadApi
 @inject ILogger<Whitelist> Logger
 @rendermode InteractiveServer
 

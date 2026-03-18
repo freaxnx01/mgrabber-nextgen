@@ -4,7 +4,7 @@
 @using GlobalStatsDto = Frontend.Services.GlobalStatsDto
 @using UserStatsDto = Frontend.Services.UserStatsDto
 @using UserDetailStatsDto = Frontend.Services.UserDetailStatsDto
-@inject DownloadApiService DownloadApi
+@inject IDownloadApiService DownloadApi
 @inject ILogger<Statistics> Logger
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Admin,SuperAdmin")]

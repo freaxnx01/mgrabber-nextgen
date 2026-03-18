@@ -1,0 +1,29 @@
+{
+  "exclude": [
+    "[DownloadApi.UnitTests]*",
+    "[DownloadApi.Integration]*",
+    "[E2E]*",
+    "[Frontend.UnitTests]*",
+    "[xunit.*]*",
+    "[*.Tests]*"
+  ],
+  "include": [
+    "[DownloadApi]*",
+    "[Frontend]*"
+  ],
+  "excludeByFile": [
+    "**/Program.cs",
+    "**/Migrations/**",
+    "**/obj/**",
+    "**/bin/**"
+  ],
+  "excludeByAttribute": [
+    "System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute",
+    "Obsolete"
+  ],
+  "mergeWith": "",
+  "output": "coverage.cobertura.xml",
+  "outputFormat": "cobertura",
+  "threshold": 60,
+  "thresholdType": "line"
+}

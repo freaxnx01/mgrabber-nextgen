@@ -70,7 +70,7 @@ builder.Services.AddHttpClient<DownloadApiService>(client =>
     client.DefaultRequestHeaders.Add("X-Api-Key", builder.Configuration["DownloadApi:ApiKey"] ?? "default-key");
 });
 
-builder.Services.AddScoped<DownloadApiService>();
+builder.Services.AddScoped<IDownloadApiService, DownloadApiService>();
 builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();

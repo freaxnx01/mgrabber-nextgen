@@ -27,9 +27,41 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test --no-build --verbosity normal
-        continue-on-error: true
+      - name: Test with Coverage
+        run: |
+          dotnet test --no-build --verbosity normal \
+            /p:CollectCoverage=true \
+            /p:CoverletOutputFormat=cobertura \
+            /p:CoverletOutput=./coverage/
+
+      - name: ReportGenerator
+        uses: danielpalme/ReportGenerator-GitHub-Action@5.4.3
+        with:
+          reports: '**/coverage.cobertura.xml'
+          targetdir: 'coveragereport'
+          reporttypes: 'HtmlInline;Cobertura;MarkdownSummaryGithub'
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coveragereport
+          retention-days: 30
+
+      - name: Add Coverage PR Comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: coveragereport/SummaryGithub.md
+
+      - name: Check Coverage Threshold
+        run: |
+          COVERAGE=$(cat coveragereport/SummaryGithub.md | grep -oP '(?<=Coverage: )[0-9]+' || echo "0")
+          echo "Code coverage: $COVERAGE%"
+          if [ "$COVERAGE" -lt "60" ]; then
+            echo "::warning::Code coverage ($COVERAGE%) is below threshold (60%)"
+          fi
 
       - name: Publish Frontend
         run: |
@@ -95,3 +127,6 @@ jobs:
           echo "### API" >> $GITHUB_STEP_SUMMARY
           echo "- Tarball: \`api-release-${{ github.sha }}.tar.gz\`" >> $GITHUB_STEP_SUMMARY
           echo "- ZIP: \`api-release-${{ github.sha }}.zip\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Code Coverage" >> $GITHUB_STEP_SUMMARY
+          cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY
