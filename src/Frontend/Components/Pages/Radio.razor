@@ -374,37 +374,4 @@
         MessageClass = "alert-danger";
         StateHasChanged();
     }
-
-    // DTOs
-    private class RadioStationDto
-    {
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-    }
-
-    private class RadioSongDto
-    {
-        public string Artist { get; set; } = "";
-        public string Title { get; set; } = "";
-        public DateTime PlayedAt { get; set; }
-        public string FormattedDuration { get; set; } = "";
-        public bool IsPlayingNow { get; set; }
-        public string Station { get; set; } = "";
-    }
-
-    private class RadioPlaylistResponseDto
-    {
-        public string Station { get; set; } = "";
-        public RadioSongDto? NowPlaying { get; set; }
-        public List<RadioSongDto> Songs { get; set; } = new();
-    }
-
-    private class YouTubeVideoDto
-    {
-        public string VideoId { get; set; } = "";
-        public string Title { get; set; } = "";
-        public string Author { get; set; } = "";
-        public string Duration { get; set; } = "";
-        public string ThumbnailUrl { get; set; } = "";
-    }
 }
