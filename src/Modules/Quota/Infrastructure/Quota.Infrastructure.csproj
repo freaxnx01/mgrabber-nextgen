@@ -6,6 +6,10 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Application/Quota.Application.csproj" />
+    <ProjectReference Include="../../../Shared/Shared.csproj" />
   </ItemGroup>
 </Project>
