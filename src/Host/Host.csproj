@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>MusicGrabber.Host</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Shared/Shared.csproj" />
+    <ProjectReference Include="../Modules/Download/Infrastructure/Download.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Discovery/Infrastructure/Discovery.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Radio/Infrastructure/Radio.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Quota/Infrastructure/Quota.Infrastructure.csproj" />
+    <ProjectReference Include="../Modules/Identity/Infrastructure/Identity.Infrastructure.csproj" />
+    <ProjectReference Include="../Frontend/Frontend.csproj" />
+  </ItemGroup>
+</Project>

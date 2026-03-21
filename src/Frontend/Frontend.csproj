@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>MusicGrabber.Frontend</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Shared/Shared.csproj" />
+  </ItemGroup>
+</Project>
