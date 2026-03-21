@@ -6,6 +6,12 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Application/Identity.Application.csproj" />
+    <ProjectReference Include="../../../Shared/Shared.csproj" />
   </ItemGroup>
 </Project>
