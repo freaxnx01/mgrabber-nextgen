@@ -3,6 +3,14 @@
     <RootNamespace>MusicGrabber.Modules.Identity.Domain</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Pragmatic trade-off: ApplicationUser : IdentityUser requires ASP.NET Core Identity, which lives in the web framework.
+         This is acceptable because Identity is inherently coupled to the auth infrastructure. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../../../Shared/Shared.csproj" />
   </ItemGroup>
 </Project>
