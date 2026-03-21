@@ -131,7 +131,7 @@ graph TB
 
 #### UC7: Choose Format & Normalize
 - **Actor:** End User
-- **Options:** MP3 (default), FLAC, M4A / WebM
+- **Options:** MP3 (default), FLAC, M4A
 - **Normalization:** Optional two-pass ffmpeg loudnorm (EBU R128, target -14 LUFS)
 
 #### UC8-UC10: File Management
@@ -730,7 +730,7 @@ erDiagram
 | Download retry attempts | 3 (exponential backoff: 2^n seconds) |
 | Normalization target | -14 LUFS (EBU R128) |
 | Email rate limit | 1 per day per quota threshold |
-| Supported audio formats | MP3, FLAC, M4A, WebM |
+| Supported audio formats | MP3, FLAC, M4A |
 
 ### 6.3 Configuration
 

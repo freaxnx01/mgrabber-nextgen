@@ -66,10 +66,19 @@ MusicGrabber.sln
 │   │
 │   ├── Shared/
 │   │   ├── Contracts/
-│   │   │   ├── IDownloadService.cs
-│   │   │   ├── IQuotaService.cs
-│   │   │   └── IUserService.cs
+│   │   │   ├── IDownloadFacade.cs
+│   │   │   ├── IQuotaFacade.cs
+│   │   │   └── IUserFacade.cs
 │   │   ├── DTOs/
+│   │   │   ├── StartDownloadRequest.cs
+│   │   │   ├── FileInfoDto.cs
+│   │   │   ├── QuotaInfoDto.cs
+│   │   │   ├── YouTubeSearchResultDto.cs
+│   │   │   ├── RadioDownloadRequest.cs
+│   │   │   ├── UserProfileDto.cs
+│   │   │   ├── UserStatsDto.cs
+│   │   │   └── GlobalStatsDto.cs
+│   │   ├── IEventBus.cs
 │   │   └── Events/
 │   │       ├── DownloadCompletedEvent.cs
 │   │       ├── FileDeletedEvent.cs
@@ -84,7 +93,8 @@ MusicGrabber.sln
 │   │   │   │   └── AudioFormat.cs
 │   │   │   ├── Application/
 │   │   │   │   ├── Ports/
-│   │   │   │   │   ├── Driving/IDownloadService.cs
+│   │   │   │   │   ├── Driving/IDownloadService.cs  ← module-internal driving port
+│   │   │   │   │   │                                   (Shared/IDownloadFacade delegates to this)
 │   │   │   │   │   └── Driven/
 │   │   │   │   │       ├── IDownloadJobRepository.cs
 │   │   │   │   │       ├── IAudioExtractor.cs
@@ -96,7 +106,8 @@ MusicGrabber.sln
 │   │   │   │       ├── StartPlaylistDownload/
 │   │   │   │       ├── GetJobStatus/
 │   │   │   │       ├── ListUserFiles/
-│   │   │   │       └── DeleteFile/
+│   │   │   │       ├── DeleteFile/
+│   │   │   │       └── GetDownloadStats/
 │   │   │   └── Infrastructure/
 │   │   │       ├── Adapters/
 │   │   │       │   ├── Persistence/
@@ -163,6 +174,7 @@ MusicGrabber.sln
 │   │   │
 │   │   └── Identity/
 │   │       ├── Domain/
+│   │       │   ├── ApplicationUser.cs
 │   │       │   ├── WhitelistEntry.cs
 │   │       │   └── UserSettings.cs
 │   │       ├── Application/
@@ -179,6 +191,7 @@ MusicGrabber.sln
 │   │       │       └── UpdateSettings/
 │   │       └── Infrastructure/
 │   │           ├── Adapters/
+│   │           │   ├── WhitelistClaimsTransformation.cs
 │   │           │   └── Persistence/
 │   │           │       ├── IdentityDbContext.cs
 │   │           │       └── Migrations/
@@ -194,6 +207,10 @@ MusicGrabber.sln
 │       │   ├── MusicBrainzSearch.razor(.cs)
 │       │   ├── Radio.razor(.cs)
 │       │   ├── Profile.razor(.cs)
+│       │   ├── Auth/
+│       │   │   ├── Login.razor
+│       │   │   ├── Logout.razor
+│       │   │   └── AccessDenied.razor
 │       │   └── Admin/
 │       │       ├── Whitelist.razor(.cs)
 │       │       └── Statistics.razor(.cs)
@@ -253,8 +270,8 @@ MusicGrabber.sln
 
 ### Dependency Map
 
-- **Download → Quota:** Synchronous check via `IQuotaService.CheckAsync()` before starting a download
-- **Radio → Download:** Synchronous handoff via `IDownloadService.StartAsync()` for radio song extraction
+- **Download → Quota:** Synchronous check via `IQuotaFacade.CheckAsync()` before starting a download
+- **Radio → Download:** Synchronous handoff via `IDownloadFacade.StartAsync()` for radio song extraction
 - **Discovery → (none):** Stateless, no module dependencies. User navigates to Home page for YouTube download.
 
 ### Domain Events (In-Process)
@@ -264,9 +281,13 @@ MusicGrabber.sln
 | `DownloadCompletedEvent` | Download | Quota | Recalculate usage, check thresholds |
 | `FileDeletedEvent` | Download | Quota | Recalculate usage, potentially unblock |
 | `UserWhitelistedEvent` | Identity | Quota | Initialize user quota record |
-| `QuotaThresholdCrossedEvent` | Quota | Quota (internal) | Send email notification |
+| `QuotaThresholdCrossedEvent` | Quota | Quota (internal) | Enqueue `SendQuotaEmailJob` via Hangfire |
 
 Implemented via a lightweight `IEventBus` in `Shared/`, registered in `Host/Program.cs`.
+
+### Shared Contracts vs Module Ports
+
+`Shared/Contracts/` contains **facade interfaces** (`IDownloadFacade`, `IQuotaFacade`, `IUserFacade`) for cross-module communication. Each module has its own **internal driving port** (e.g., `IDownloadService`) with the full API surface. The facade delegates to the internal port but exposes only the subset needed by other modules. This prevents modules from depending on each other's full API.
 
 ---
 
@@ -355,7 +376,7 @@ Each video gets its own `ExtractAudioJob`. Failures don't block the batch. Retri
 | `Title` | `string` | |
 | `Author` | `string` | |
 | `Format` | `string` | Mp3, Flac, M4a |
-| `Status` | `string` | Pending, Downloading, Completed, Failed |
+| `Status` | `string` | Pending, Downloading, Normalizing, Completed, Failed |
 | `Progress` | `int` | 0-100 |
 | `OriginalFilename` | `string` | |
 | `CorrectedFilename` | `string` | Cleaned filename |
@@ -435,6 +456,7 @@ All endpoints in `Host/Endpoints/`, versioned under `/api/v1/`.
 | POST | `/api/v1/downloads` | Start single download |
 | GET | `/api/v1/downloads/{id}/status` | Job progress |
 | GET | `/api/v1/downloads/users/{userId}` | User's jobs |
+| GET | `/api/v1/downloads/users/{userId}/stats` | User download stats (total, completed, top artists, 30d trend) |
 | GET | `/api/v1/playlists/info?url=` | Playlist metadata |
 | GET | `/api/v1/playlists/videos?playlistId=` | Video list |
 | POST | `/api/v1/playlists/download` | Batch download |
@@ -456,7 +478,7 @@ All endpoints in `Host/Endpoints/`, versioned under `/api/v1/`.
 | GET | `/api/v1/radio/stations` | Station list |
 | GET | `/api/v1/radio/stations/{id}/now-playing` | Current song |
 | GET | `/api/v1/radio/stations/{id}/playlist?limit=` | Recent playlist |
-| POST | `/api/v1/radio/download` | Download now-playing |
+| POST | `/api/v1/radio/download` | Download now-playing (body: `RadioDownloadRequest` with `stationId`, `artist`, `title`; auto-searches YouTube for best match) |
 
 ### Quota
 
@@ -578,6 +600,7 @@ Single Docker container (Hybrid approach).
 | `SMTP_HOST` | Yes | Email notifications |
 | `SMTP_PORT` | Yes | |
 | `SMTP_PASSWORD` | Yes | |
+| `SMTP_FROM` | Yes | Sender email address |
 | `ConnectionStrings__Default` | Yes | SQLite connection string |
 | `Serilog__MinimumLevel` | No | Log level override |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | No | OpenTelemetry collector |
@@ -598,3 +621,24 @@ Single Docker container (Hybrid approach).
 | Audio formats | MP3, FLAC, M4A |
 | Global concurrent extractions | 9 |
 | Per-user concurrent extractions | 3 |
+
+---
+
+## 16. Database Migration Strategy
+
+EF Core migrations are run as a **separate init step** before the app starts — never inside `app.Run()` (per 12-Factor compliance). In Docker, this is handled via an entrypoint script that runs `dotnet ef database update` before starting the host. Locally, migrations are applied via CLI.
+
+---
+
+## 17. CORS
+
+CORS is configured in `Host/Program.cs` to allow requests from `localhost` origins during development (for Bruno and other API testing tools). In production, CORS is restricted to the app's own origin since the Blazor frontend is embedded in the same host.
+
+---
+
+## 18. Out of Scope (v1)
+
+- **Download cancellation** — no way to cancel an in-progress yt-dlp extraction. May be added in a future version.
+- **WebM format** — dropped from the PRD. Only MP3, FLAC, M4A are supported.
+- **Multiple OAuth providers** — only Google for v1. ASP.NET Core Identity supports adding more later.
+- **Mobile app / PWA** — API is exposed but no dedicated mobile client.
