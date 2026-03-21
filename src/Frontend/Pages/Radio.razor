@@ -1,0 +1,111 @@
+@page "/radio"
+@attribute [Authorize]
+
+<MudText Typo="Typo.h4" Class="mb-1">Radio Now Playing</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Swiss radio stations — extract audio</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <StationSelector Stations="_stations"
+                     SelectedStation="_selectedStationId"
+                     SelectedStationChanged="OnStationChangedAsync"
+                     IsLoading="_isLoadingStations" />
+</MudPaper>
+
+@if (_nowPlaying is not null)
+{
+    <MudPaper Elevation="3" Class="pa-6 mb-4">
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Spacing="1">
+                <MudText Typo="Typo.h5">@_nowPlaying.Title</MudText>
+                <MudText Typo="Typo.h6" Color="Color.Secondary">@_nowPlaying.Artist</MudText>
+                <MudStack Row Spacing="1">
+                    <MudChip T="string" Size="Size.Small">
+                        @FormatDuration(_nowPlaying.StartTime, _nowPlaying.EndTime)
+                    </MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                        Started: @_nowPlaying.StartTime.ToLocalTime().ToString("HH:mm")
+                    </MudChip>
+                </MudStack>
+            </MudStack>
+            <MudIcon Icon="@Icons.Material.Filled.MusicNote" Size="Size.Large" Color="Color.Primary" />
+        </MudStack>
+        <MudStack Row Spacing="2" Class="mt-4">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       Size="Size.Large"
+                       StartIcon="@Icons.Material.Filled.Download"
+                       OnClick="ExtractAudioAsync">
+                Extract Audio
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       StartIcon="@Icons.Material.Filled.OndemandVideo"
+                       OnClick="() => SearchYouTubeAsync(_nowPlaying)">
+                Search YouTube
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+}
+else if (!_isLoadingStations && _selectedStationId is not null)
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="120px" />
+    </MudPaper>
+}
+
+@if (_playlist is { Count: > 0 })
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+            <MudText Typo="Typo.h6">Recent Playlist</MudText>
+            <MudChip T="string" Color="Color.Info" Size="Size.Small">@_playlist.Count songs</MudChip>
+        </MudStack>
+        <MudList T="string">
+            @foreach (var song in _playlist)
+            {
+                <MudListItem>
+                    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="w-100">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.subtitle1">@song.Title</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @song.Artist · @song.StartTime.ToLocalTime().ToString("HH:mm")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row Spacing="1">
+                            <MudButton Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Download"
+                                       OnClick="() => ExtractSongAsync(song)">
+                                Extract
+                            </MudButton>
+                            <MudButton Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.OndemandVideo"
+                                       OnClick="() => SearchYouTubeAsync(song)">
+                                YouTube
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudListItem>
+                <MudDivider />
+            }
+        </MudList>
+    </MudPaper>
+}
+
+@if (_showYouTubeDialog)
+{
+    <MudDialog @bind-Visible="_showYouTubeDialog">
+        <TitleContent>
+            <MudText Typo="Typo.h6">YouTube Results for '@_youTubeQuery'</MudText>
+        </TitleContent>
+        <DialogContent>
+            <YouTubeResultsList Results="_youTubeResults"
+                                IsLoading="_isSearchingYouTube"
+                                OnDownload="DownloadFromDialogAsync"
+                                OnDownloadWithFormat="DownloadWithFormatFromDialogAsync" />
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseYouTubeDialog">Close</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
