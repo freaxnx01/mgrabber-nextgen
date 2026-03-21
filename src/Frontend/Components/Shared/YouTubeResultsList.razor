@@ -1,0 +1,51 @@
+@if (IsLoading)
+{
+    <MudStack Spacing="2">
+        @for (var i = 0; i < 3; i++)
+        {
+            <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="80px" />
+        }
+    </MudStack>
+}
+else if (Results is { Count: > 0 })
+{
+    <MudList T="YouTubeSearchResultDto">
+        @foreach (var result in Results)
+        {
+            <MudListItem>
+                <MudStack Row AlignItems="AlignItems.Center" Class="w-100">
+                    <MudImage Src="@result.ThumbnailUrl"
+                              Alt="@result.Title"
+                              Width="120"
+                              Height="68"
+                              ObjectFit="ObjectFit.Cover"
+                              Class="rounded" />
+                    <MudStack Spacing="0" Class="flex-grow-1">
+                        <MudText Typo="Typo.subtitle1">@result.Title</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @result.Author · @result.Duration
+                        </MudText>
+                    </MudStack>
+                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                        <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                       Color="Color.Success"
+                                       OnClick="() => OnDownload.InvokeAsync(result)" />
+                        <MudMenu Icon="@Icons.Material.Filled.AudioFile" Dense>
+                            <MudMenuItem OnClick="@(() => DownloadWithFormat(result, FormatMp3))">MP3</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => DownloadWithFormat(result, FormatFlac))">FLAC</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => DownloadWithFormat(result, FormatM4a))">M4A</MudMenuItem>
+                            <MudMenuItem OnClick="@(() => DownloadWithFormat(result, FormatWebM))">WebM</MudMenuItem>
+                        </MudMenu>
+                    </MudStack>
+                </MudStack>
+            </MudListItem>
+            <MudDivider />
+        }
+    </MudList>
+}
+else if (!IsLoading)
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+        No results found.
+    </MudText>
+}
