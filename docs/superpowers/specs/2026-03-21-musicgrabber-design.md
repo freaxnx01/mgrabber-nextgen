@@ -375,7 +375,7 @@ Each video gets its own `ExtractAudioJob`. Failures don't block the batch. Retri
 | `VideoId` | `string` | YouTube video ID |
 | `Title` | `string` | |
 | `Author` | `string` | |
-| `Format` | `string` | Mp3, Flac, M4a |
+| `Format` | `string` | Mp3, Flac, M4a, WebM |
 | `Status` | `string` | Pending, Downloading, Normalizing, Completed, Failed |
 | `Progress` | `int` | 0-100 |
 | `OriginalFilename` | `string` | |
@@ -412,7 +412,7 @@ Indexes: `UserId`, `Status`, `VideoId`, `PlaylistId`
 |--------|------|-------|
 | `Id` | `Guid` | PK |
 | `UserId` | `string` | UK, FK |
-| `DefaultFormat` | `string` | Mp3, Flac, M4a |
+| `DefaultFormat` | `string` | Mp3, Flac, M4a, WebM |
 | `EnableNormalization` | `bool` | |
 | `NormalizationLufs` | `int` | -20 to -10, default -14 |
 | `EmailNotifications` | `bool` | |
@@ -618,7 +618,7 @@ Single Docker container (Hybrid approach).
 | Download retry attempts | 3 (exponential backoff: 2^n seconds) |
 | Normalization target | -14 LUFS (EBU R128) |
 | Email rate limit | 1 per day per quota threshold |
-| Audio formats | MP3, FLAC, M4A |
+| Audio formats | MP3, FLAC, M4A, WebM |
 | Global concurrent extractions | 9 |
 | Per-user concurrent extractions | 3 |
 
@@ -639,6 +639,5 @@ CORS is configured in `Host/Program.cs` to allow requests from `localhost` origi
 ## 18. Out of Scope (v1)
 
 - **Download cancellation** — no way to cancel an in-progress yt-dlp extraction. May be added in a future version.
-- **WebM format** — dropped from the PRD. Only MP3, FLAC, M4A are supported.
 - **Multiple OAuth providers** — only Google for v1. ASP.NET Core Identity supports adding more later.
 - **Mobile app / PWA** — API is exposed but no dedicated mobile client.
