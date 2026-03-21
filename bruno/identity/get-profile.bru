@@ -1,0 +1,17 @@
+meta {
+  name: Get User Profile
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/users/{{userId}}/profile
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.userId: isDefined
+  res.body.email: isDefined
+}

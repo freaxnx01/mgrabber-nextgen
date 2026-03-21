@@ -1,0 +1,21 @@
+meta {
+  name: Search MusicBrainz
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/musicbrainz/search?type=artist&q=Daft Punk
+  body: none
+  auth: none
+}
+
+params:query {
+  type: artist
+  q: Daft Punk
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}

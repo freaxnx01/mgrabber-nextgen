@@ -1,0 +1,18 @@
+meta {
+  name: Get User Quota
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/quotas/users/{{userId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.userId: isDefined
+  res.body.usedBytes: isDefined
+  res.body.limitBytes: isDefined
+}

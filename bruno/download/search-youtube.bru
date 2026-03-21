@@ -1,0 +1,20 @@
+meta {
+  name: Search YouTube
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/youtube/search?q=Daft Punk - Get Lucky
+  body: none
+  auth: none
+}
+
+params:query {
+  q: Daft Punk - Get Lucky
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}
