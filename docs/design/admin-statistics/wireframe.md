@@ -1,166 +1,74 @@
-# Admin Statistics Page - Wireframe (Phase 1)
-
-**Feature:** Admin dashboard with system statistics  
-**Route:** `/admin/statistics`  
-**Component:** `Statistics.razor`  
-**Authorization:** Admin or SuperAdmin role required  
-**Created:** Retroactively (2026-03-14)  
-**Status:** ✅ Implemented
-
----
-
-## Layout Overview
+# Admin Statistics Dashboard Wireframe
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  📊 Admin Statistics                                                │
-│  Overview of system usage and download statistics                   │
-├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │
-│  │ Total      │ │ Storage    │ │ Active     │ │ Success    │       │
-│  │ Downloads  │ │ Used       │ │ Users (7d) │ │ Rate       │       │
-│  │            │ │            │ │            │ │            │       │
-│  │  1,234     │ │ 456.7 MB   │ │    42      │ │   98.5%    │       │
-│  └────────────┘ └────────────┘ └────────────┘ └────────────┘       │
-│           [bg-primary]   [bg-success]   [bg-info]   [bg-warning]   │
+│  MudText Typo="h4"    Statistics                                    │
+│  MudText Typo="body2" System usage overview                         │
 │                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Download Status Distribution                               │   │
-│  ├─────────────────────────────────────────────────────────────┤   │
-│  │  [Completed] 1,200    [Pending] 15    [Failed] 19           │   │
-│  │  [Processing] 45      [Cancelled] 5                         │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─ MudGrid ─────────────────────────────────────────────────────┐  │
+│  │  MudItem x4                                                    │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐      │  │
+│  │  │  1,247   │  │ 12.4 GB  │  │    8     │  │  91.2%   │      │  │
+│  │  │  Total   │  │ Storage  │  │ Active   │  │ Success  │      │  │
+│  │  │Downloads │  │  Used    │  │Users(7d) │  │  Rate    │      │  │
+│  │  │Color=Prim│  │Color=Succ│  │Color=Info│  │Color=Warn│      │  │
+│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘      │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Downloads Per Day (Last 30 Days)                           │   │
-│  ├─────────────────────────────────────────────────────────────┤   │
-│  │  Date          │ Downloads │ Visual Bar                     │   │
-│  │  ──────────────┼───────────┼────────────────────────────    │   │
-│  │  2026-03-14    │    45     │ ████████████████████           │   │
-│  │  2026-03-13    │    38     │ ████████████████               │   │
-│  │  2026-03-12    │    52     │ ███████████████████████        │   │
-│  │  ...           │    ...    │ ...                            │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─ MudPaper "Status Distribution" ──────────────────────────────┐  │
+│  │  MudChip Color=Success [Completed 1137]                        │  │
+│  │  MudChip Color=Error   [Failed 82]                             │  │
+│  │  MudChip Color=Warning [Pending 18]                            │  │
+│  │  MudChip Color=Info    [Downloading 10]                        │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  User Statistics                                            │   │
-│  ├─────────────────────────────────────────────────────────────┤   │
-│  │  User ID      │ Downloads │ Storage    │ Top Artist        │   │
-│  │  ─────────────┼───────────┼────────────┼────────────────   │   │
-│  │  user1        │    25     │ 120.5 MB   │ Roxette           │   │
-│  │  user2        │    18     │ 89.3 MB    │ Queen             │   │
-│  │  ...          │    ...    │ ...        │ ...               │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─ MudPaper "Downloads Per Day (30 days)" ──────────────────────┐  │
+│  │  MudSimpleTable                                                │  │
+│  │  2026-03-21  12  MudProgressLinear ████████████░░░░░           │  │
+│  │  2026-03-20  18  MudProgressLinear ██████████████████           │  │
+│  │  2026-03-19   8  MudProgressLinear ████████░░░░░░░░░           │  │
+│  │  2026-03-18  22  MudProgressLinear ██████████████████████       │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │  Top Artists                                                │   │
-│  ├─────────────────────────────────────────────────────────────┤   │
-│  │  Artist              │ Downloads │ % of Total               │   │
-│  │  ────────────────────┼───────────┼──────────────────        │   │
-│  │  Roxette             │    45     │ ████████████ 15%         │   │
-│  │  Queen               │    38     │ ██████████ 12%           │   │
-│  │  ...                 │    ...    │ ...                      │   │
-│  └─────────────────────────────────────────────────────────────┘   │
+│  ┌─ MudPaper "Users" ────────────────────────────────────────────┐  │
+│  │  MudDataGrid                                                   │  │
+│  │  ┌────────┬───────┬────────┬──────┬──────┬──────────┬───────┐  │  │
+│  │  │ User   │ Total │Storage │ Done │ Fail │ Active   │       │  │  │
+│  │  ├────────┼───────┼────────┼──────┼──────┼──────────┼───────┤  │  │
+│  │  │alice.. │  312  │ 3.2 GB │  298 │   14 │ 03-21    │[Detail│  │  │
+│  │  │bob..   │  189  │ 1.8 GB │  180 │    9 │ 03-20    │[Detail│  │  │
+│  │  └────────┴───────┴────────┴──────┴──────┴──────────┴───────┘  │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                     │
+│  ┌─ MudDialog "User Details: alice@mail.com" ────────────────────┐  │
+│  │  MudGrid                                                       │  │
+│  │  ┌────────┐  ┌────────┐  ┌────────┐                            │  │
+│  │  │  312   │  │ 3.2 GB │  │ 95.5%  │                            │  │
+│  │  │ Total  │  │Storage │  │Success │                            │  │
+│  │  └────────┘  └────────┘  └────────┘                            │  │
+│  │                                                                │  │
+│  │  MudText "Top Artists"                                         │  │
+│  │  MudSimpleTable                                                │  │
+│  │  Queen                             MudChip [42 downloads]      │  │
+│  │  Radiohead                         MudChip [28 downloads]      │  │
+│  │  Pink Floyd                        MudChip [19 downloads]      │  │
+│  │                                              MudButton [Close] │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
----
+## Components
 
-## Components Breakdown
+- `MudPaper` stat cards — colored backgrounds per metric type
+- `MudChip` — status distribution with semantic colors
+- `MudSimpleTable` with inline `MudProgressLinear` — downloads-per-day trend
+- `MudDataGrid` — user stats with detail button
+- `MudDialog` — user detail drill-down with top artists
 
-### 1. Header Section
-- **Title:** "📊 Admin Statistics" (h1)
-- **Subtitle:** "Overview of system usage and download statistics"
+## Interactions
 
-### 2. Alert/Message Area
-- **Type:** Bootstrap alert (danger for errors)
-- **Position:** Below subtitle
-- **Trigger:** API errors
-
-### 3. Stats Cards Row
-4-column grid with colored cards:
-
-| Card | Color | Metric | Data Source |
-|------|-------|--------|-------------|
-| Total Downloads | bg-primary | `GlobalStats.TotalDownloads` | API |
-| Storage Used | bg-success | `GlobalStats.TotalStorageMB` | API |
-| Active Users (7d) | bg-info | `GlobalStats.ActiveUsersLast7Days` | API |
-| Success Rate | bg-warning | Calculated from status counts | Derived |
-
-### 4. Status Distribution Card
-- **Header:** "Download Status Distribution"
-- **Content:** Grid of status badges with counts
-- **Statuses:** Completed, Pending, Failed, Processing, Cancelled
-
-### 5. Downloads Per Day Card
-- **Header:** "Downloads Per Day (Last 30 Days)"
-- **Content:** Table with visual bar representation
-- **Columns:** Date, Downloads, Bar
-
-### 6. User Statistics Card
-- **Header:** "User Statistics"
-- **Content:** Table with user details
-- **Columns:** User ID, Downloads, Storage, Top Artist
-
-### 7. Top Artists Card
-- **Header:** "Top Artists"
-- **Content:** Table with percentage bars
-- **Columns:** Artist, Downloads, % of Total
-
----
-
-## Empty States
-
-### No Data Yet (Fresh Install)
-```
-┌─────────────────────────────────────────────────────────┐
-│  Total Downloads                                        │
-│                                                         │
-│  0                                                      │
-└─────────────────────────────────────────────────────────┘
-(All cards show 0 or empty tables)
-```
-
-### Loading State
-```
-┌─────────────────────────────────────────────────────────┐
-│  Download Status Distribution                           │
-├─────────────────────────────────────────────────────────┤
-│  Loading... (no explicit spinner shown)                 │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Access Denied (Non-Admin)
-- Handled by `@attribute [Authorize(Roles = "Admin,SuperAdmin")]`
-- Redirects to login or shows access denied page
-
----
-
-## Color Scheme
-
-| Element | Bootstrap Class | Text Color |
-|---------|-----------------|------------|
-| Total Downloads card | `bg-primary` | `text-white` |
-| Storage Used card | `bg-success` | `text-white` |
-| Active Users card | `bg-info` | `text-white` |
-| Success Rate card | `bg-warning` | `text-dark` |
-| Status badges | Various | - |
-| Tables | `table`, `table-sm` | - |
-| Cards | `card`, `mb-4` | - |
-
----
-
-## Responsive Behavior
-
-| Screen | Layout |
-|--------|--------|
-| Desktop (>1200px) | 4 cards in row, full tables |
-| Desktop (>992px) | 4 cards in row, scrollable tables |
-| Tablet (768px) | 2x2 card grid, stacked sections |
-| Mobile (<576px) | Single column, all cards stacked |
-
----
-
-**Approval Status:** ✅ Retroactively documented (originally built without wireframe)
+- Page loads global stats from Download + Quota modules, aggregated in frontend service
+- User stats loaded from Download module
+- Detail button opens `MudDialog` with per-user stats from Download module
+- Admin-only page — `[Authorize(Roles = "Admin")]`
