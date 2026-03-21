@@ -3,9 +3,15 @@
     <RootNamespace>MusicGrabber.Frontend</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="MudBlazor" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Shared/Shared.csproj" />
+    <ProjectReference Include="../Modules/Download/Application/Download.Application.csproj" />
+    <ProjectReference Include="../Modules/Discovery/Application/Discovery.Application.csproj" />
+    <ProjectReference Include="../Modules/Radio/Application/Radio.Application.csproj" />
+    <ProjectReference Include="../Modules/Quota/Application/Quota.Application.csproj" />
+    <ProjectReference Include="../Modules/Identity/Application/Identity.Application.csproj" />
   </ItemGroup>
 </Project>

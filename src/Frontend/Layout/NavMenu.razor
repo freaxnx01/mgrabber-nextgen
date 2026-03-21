@@ -1,0 +1,26 @@
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All"
+                Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+    <MudNavLink Href="/playlist" Match="NavLinkMatch.Prefix"
+                Icon="@Icons.Material.Filled.PlaylistPlay">Playlist</MudNavLink>
+    <MudNavLink Href="/musicbrainz" Match="NavLinkMatch.Prefix"
+                Icon="@Icons.Material.Filled.Album">MusicBrainz</MudNavLink>
+    <MudNavLink Href="/radio" Match="NavLinkMatch.Prefix"
+                Icon="@Icons.Material.Filled.Radio">Radio</MudNavLink>
+    <MudNavLink Href="/profile" Match="NavLinkMatch.Prefix"
+                Icon="@Icons.Material.Filled.Person">Profile</MudNavLink>
+
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <MudDivider Class="my-2" />
+            <MudText Typo="Typo.overline" Class="px-4 mt-2">Admin</MudText>
+            <MudNavLink Href="/admin/whitelist" Match="NavLinkMatch.Prefix"
+                        Icon="@Icons.Material.Filled.VerifiedUser">Whitelist</MudNavLink>
+            <MudNavLink Href="/admin/statistics" Match="NavLinkMatch.Prefix"
+                        Icon="@Icons.Material.Filled.BarChart">Statistics</MudNavLink>
+            <MudDivider Class="my-2" />
+            <MudNavLink Href="/hangfire" Target="_blank"
+                        Icon="@Icons.Material.Filled.Work">Jobs</MudNavLink>
+        </Authorized>
+    </AuthorizeView>
+</MudNavMenu>

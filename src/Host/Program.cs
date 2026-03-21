@@ -16,6 +16,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using MusicGrabber.Host.Endpoints;
+using MusicGrabber.Frontend.Services;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -69,6 +70,9 @@ builder.Services.AddQuotaModule(connectionString);
 builder.Services.AddDiscoveryModule();
 builder.Services.AddRadioModule();
 builder.Services.AddDownloadModule(builder.Configuration);
+
+// Frontend Services
+builder.Services.AddFrontendServices();
 
 // Google OAuth
 builder.Services.AddAuthentication()
@@ -128,9 +132,8 @@ app.MapPrometheusScrapingEndpoint("/metrics");
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-// NOTE: Blazor component mapping deferred until Frontend App component is created in Chunk 7
-// app.MapRazorComponents<MusicGrabber.Frontend.Components.App>()
-//     .AddInteractiveServerRenderMode();
+app.MapRazorComponents<MusicGrabber.Frontend.Components.App>()
+    .AddInteractiveServerRenderMode();
 
 // API Endpoints
 app.MapDownloadEndpoints();
