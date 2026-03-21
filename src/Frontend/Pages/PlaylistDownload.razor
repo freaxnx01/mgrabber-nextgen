@@ -1,0 +1,88 @@
+@page "/playlist"
+@attribute [Authorize]
+
+<MudText Typo="Typo.h4" Class="mb-1">Playlist Download</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Download entire YouTube playlists</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+        <MudTextField @bind-Value="_playlistUrl"
+                      Label="YouTube playlist URL"
+                      Variant="Variant.Outlined"
+                      Placeholder="https://youtube.com/playlist?list=..."
+                      Class="flex-grow-1" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="LoadPlaylistAsync"
+                   Disabled="_isLoading">
+            Load Playlist
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_playlistVideos is { Count: > 0 })
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Spacing="3">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                <MudSelect T="string" @bind-Value="_selectedFormat" Label="Format" Variant="Variant.Outlined" Style="max-width: 150px;">
+                    <MudSelectItem Value="@("Mp3")">MP3</MudSelectItem>
+                    <MudSelectItem Value="@("Flac")">FLAC</MudSelectItem>
+                    <MudSelectItem Value="@("M4a")">M4A</MudSelectItem>
+                    <MudSelectItem Value="@("WebM")">WebM</MudSelectItem>
+                </MudSelect>
+                <MudSwitch @bind-Value="_normalizeAudio" Color="Color.Primary" Label="Normalize Audio" />
+                <MudSpacer />
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Success"
+                           OnClick="DownloadSelectedAsync"
+                           Disabled="_isDownloading">
+                    Download (@_selectedVideos.Count)
+                </MudButton>
+            </MudStack>
+
+            <QuotaIndicator Quota="_quota" />
+
+            <MudDataGrid T="YouTubeSearchResultDto"
+                         Items="_playlistVideos"
+                         MultiSelection
+                         @bind-SelectedItems="_selectedVideos"
+                         Hover Dense>
+                <Columns>
+                    <SelectColumn T="YouTubeSearchResultDto" />
+                    <TemplateColumn Title="#">
+                        <CellTemplate>
+                            <MudText Typo="Typo.body2">@((_playlistVideos!.IndexOf(context.Item) + 1))</MudText>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="Thumbnail">
+                        <CellTemplate>
+                            <MudImage Src="@context.Item.ThumbnailUrl"
+                                      Width="80" Height="45"
+                                      ObjectFit="ObjectFit.Cover"
+                                      Class="rounded" />
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.Title" Title="Title" />
+                    <PropertyColumn Property="x => x.Author" Title="Channel" />
+                    <TemplateColumn Title="">
+                        <CellTemplate>
+                            <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                           Size="Size.Small"
+                                           Color="Color.Success"
+                                           OnClick="() => DownloadSingleAsync(context.Item)" />
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudStack>
+    </MudPaper>
+}
+
+@if (_activeJobs is { Count: > 0 })
+{
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-2">Download Progress</MudText>
+        <DownloadProgressCard Jobs="_activeJobs" />
+    </MudPaper>
+}

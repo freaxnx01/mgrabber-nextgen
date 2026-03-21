@@ -1,0 +1,75 @@
+@page "/"
+@attribute [Authorize]
+
+<MudText Typo="Typo.h4" Class="mb-1">Music Downloader</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Search and download music from YouTube</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+        <MudTextField @bind-Value="_searchQuery"
+                      Label="Search for songs, artists..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      OnKeyUp="HandleSearchKeyUp"
+                      Class="flex-grow-1" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   OnClick="SearchAsync"
+                   Disabled="_isSearching">
+            Search
+        </MudButton>
+    </MudStack>
+
+    <YouTubeResultsList Results="_searchResults"
+                        IsLoading="_isSearching"
+                        OnDownload="DownloadDefaultAsync"
+                        OnDownloadWithFormat="DownloadWithFormatAsync" />
+</MudPaper>
+
+@if (_activeJobs is { Count: > 0 })
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-2">Active Downloads</MudText>
+        <DownloadProgressCard Jobs="_activeJobs" />
+    </MudPaper>
+}
+
+<MudPaper Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-2">Your Files</MudText>
+    @if (_isLoadingFiles)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+    }
+    else
+    {
+        <MudDataGrid T="FileInfoDto" Items="_userFiles" Hover Striped Dense>
+            <Columns>
+                <PropertyColumn Property="x => x.Title" Title="Title" />
+                <PropertyColumn Property="x => x.Author" Title="Artist" />
+                <TemplateColumn Title="Size">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2">@FormatBytes(context.Item.FileSizeBytes)</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.Format" Title="Format" />
+                <TemplateColumn Title="Actions">
+                    <CellTemplate>
+                        <MudStack Row Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                           Size="Size.Small"
+                                           Href="@GetDownloadUrl(context.Item.JobId)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="() => ConfirmDeleteAsync(context.Item)" />
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+            <PagerContent>
+                <MudDataGridPager T="FileInfoDto" />
+            </PagerContent>
+        </MudDataGrid>
+    }
+</MudPaper>
