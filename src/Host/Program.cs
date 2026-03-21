@@ -16,7 +16,9 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
 using MusicGrabber.Host.Endpoints;
+using MusicGrabber.Host.Jobs;
 using MusicGrabber.Frontend.Services;
+using MusicGrabber.Shared.Events;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -145,5 +147,40 @@ app.MapAdminEndpoints();
 
 // SignalR Hub
 app.MapHub<MusicGrabber.Host.Hubs.DownloadHub>("/hubs/download");
+
+// Domain Event Subscriptions
+var eventBus = app.Services.GetRequiredService<IEventBus>();
+
+eventBus.Subscribe<DownloadCompletedEvent>((evt, ct) =>
+{
+    using var scope = app.Services.CreateScope();
+    var jobClient = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+    jobClient.Enqueue<UpdateQuotaJob>(j => j.ExecuteAsync(evt.UserId));
+    return Task.CompletedTask;
+});
+
+eventBus.Subscribe<FileDeletedEvent>((evt, ct) =>
+{
+    using var scope = app.Services.CreateScope();
+    var jobClient = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+    jobClient.Enqueue<UpdateQuotaJob>(j => j.ExecuteAsync(evt.UserId));
+    return Task.CompletedTask;
+});
+
+eventBus.Subscribe<UserWhitelistedEvent>((evt, ct) =>
+{
+    using var scope = app.Services.CreateScope();
+    var jobClient = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+    jobClient.Enqueue<SendWelcomeEmailJob>(j => j.ExecuteAsync(evt.UserId));
+    return Task.CompletedTask;
+});
+
+eventBus.Subscribe<QuotaThresholdCrossedEvent>((evt, ct) =>
+{
+    using var scope = app.Services.CreateScope();
+    var jobClient = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
+    jobClient.Enqueue<SendQuotaEmailJob>(j => j.ExecuteAsync(evt.UserId, evt.Threshold));
+    return Task.CompletedTask;
+});
 
 app.Run();
