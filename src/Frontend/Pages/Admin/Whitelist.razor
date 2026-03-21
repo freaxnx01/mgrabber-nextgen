@@ -1,0 +1,116 @@
+@page "/admin/whitelist"
+@attribute [Authorize(Roles = "Admin")]
+
+<MudText Typo="Typo.h4" Class="mb-1">Whitelist Management</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Manage user access</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+        <MudTextField @bind-Value="_searchFilter"
+                      Label="Search users..."
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search"
+                      Class="flex-grow-1" />
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                   OnClick="OpenAddDialog">
+            Add User
+        </MudButton>
+    </MudStack>
+</MudPaper>
+
+<MudPaper Class="pa-4">
+    @if (_isLoading)
+    {
+        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="300px" />
+    }
+    else
+    {
+        <MudDataGrid T="WhitelistEntryViewModel"
+                     Items="FilteredEntries"
+                     Hover Striped Dense
+                     Filterable="false">
+            <Columns>
+                <PropertyColumn Property="x => x.UserId" Title="Email" />
+                <TemplateColumn Title="Added">
+                    <CellTemplate>
+                        <MudText Typo="Typo.body2">@context.Item.AddedAt.ToString("yyyy-MM-dd")</MudText>
+                    </CellTemplate>
+                </TemplateColumn>
+                <PropertyColumn Property="x => x.AddedBy" Title="Added By" />
+                <TemplateColumn Title="Status">
+                    <CellTemplate>
+                        <MudChip T="string"
+                                 Color="@(context.Item.IsActive ? Color.Success : Color.Default)"
+                                 Size="Size.Small">
+                            @(context.Item.IsActive ? "Active" : "Disabled")
+                        </MudChip>
+                    </CellTemplate>
+                </TemplateColumn>
+                <TemplateColumn Title="Actions">
+                    <CellTemplate>
+                        <MudStack Row Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Filled.ToggleOn"
+                                           Size="Size.Small"
+                                           Color="@(context.Item.IsActive ? Color.Warning : Color.Success)"
+                                           OnClick="() => ToggleStatusAsync(context.Item)" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="() => ConfirmRemoveAsync(context.Item)" />
+                        </MudStack>
+                    </CellTemplate>
+                </TemplateColumn>
+            </Columns>
+        </MudDataGrid>
+    }
+</MudPaper>
+
+@if (_showAddDialog)
+{
+    <MudDialog @bind-Visible="_showAddDialog">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Add User</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudForm @ref="_addForm">
+                <MudTextField @bind-Value="_newEmail"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              InputType="InputType.Email"
+                              Required
+                              RequiredError="Email is required"
+                              Class="mb-3" />
+                <MudSelect T="string" @bind-Value="_newRole" Label="Role" Variant="Variant.Outlined" Class="mb-3">
+                    <MudSelectItem Value="@("User")">User</MudSelectItem>
+                    <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
+                </MudSelect>
+                <MudSwitch @bind-Value="_sendWelcomeEmail" Color="Color.Primary" Label="Send welcome email" />
+            </MudForm>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseAddDialog">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddUserAsync">Add</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@if (_showRemoveDialog)
+{
+    <MudDialog @bind-Visible="_showRemoveDialog">
+        <TitleContent>
+            <MudText Typo="Typo.h6">Remove User?</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudAlert Severity="Severity.Warning">
+                Remove @_entryToRemove?.UserId? They will lose access.
+            </MudAlert>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseRemoveDialog">Cancel</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="RemoveUserAsync">Remove</MudButton>
+        </DialogActions>
+    </MudDialog>
+}

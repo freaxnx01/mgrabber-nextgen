@@ -1,0 +1,168 @@
+@page "/admin/statistics"
+@attribute [Authorize(Roles = "Admin")]
+
+<MudText Typo="Typo.h4" Class="mb-1">Statistics</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">System usage overview</MudText>
+
+@if (_isLoading)
+{
+    <MudGrid>
+        @for (var i = 0; i < 4; i++)
+        {
+            <MudItem xs="12" sm="6" md="3">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="100px" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+else if (_stats is not null)
+{
+    <MudGrid Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Style="background-color: var(--mud-palette-primary-lighten);">
+                <MudText Typo="Typo.h4" Color="Color.Primary">@_stats.TotalDownloads.ToString("N0")</MudText>
+                <MudText Typo="Typo.caption">Total Downloads</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Style="background-color: var(--mud-palette-success-lighten);">
+                <MudText Typo="Typo.h4" Color="Color.Success">@FormatBytes(_stats.TotalStorageBytes)</MudText>
+                <MudText Typo="Typo.caption">Storage Used</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Style="background-color: var(--mud-palette-info-lighten);">
+                <MudText Typo="Typo.h4" Color="Color.Info">@_stats.ActiveUsersLast7Days</MudText>
+                <MudText Typo="Typo.caption">Active Users (7d)</MudText>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Class="pa-4 d-flex flex-column align-center" Style="background-color: var(--mud-palette-warning-lighten);">
+                <MudText Typo="Typo.h4" Color="Color.Warning">@SuccessRate</MudText>
+                <MudText Typo="Typo.caption">Success Rate</MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @if (_stats.StatusCounts.Count > 0)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Status Distribution</MudText>
+            <MudStack Row Spacing="2" Wrap="Wrap.Wrap">
+                @foreach (var status in _stats.StatusCounts)
+                {
+                    <MudChip T="string" Color="GetStatusColor(status.Key)" Size="Size.Small">
+                        @status.Key @status.Value
+                    </MudChip>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+
+    @if (_stats.DownloadsPerDay.Count > 0)
+    {
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Downloads Per Day (30 days)</MudText>
+            <MudSimpleTable Hover Striped Dense>
+                <tbody>
+                    @foreach (var day in _stats.DownloadsPerDay.Take(30))
+                    {
+                        <tr>
+                            <td style="width: 120px;">@day.Key</td>
+                            <td style="width: 60px;">@day.Value</td>
+                            <td>
+                                <MudProgressLinear Value="GetDayPercentage(day.Value)" Color="Color.Primary" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+
+    @if (_stats.Users.Count > 0)
+    {
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Users</MudText>
+            <MudDataGrid T="UserStatsDto" Items="_stats.Users" Hover Striped Dense>
+                <Columns>
+                    <PropertyColumn Property="x => x.UserId" Title="User" />
+                    <PropertyColumn Property="x => x.TotalDownloads" Title="Total" />
+                    <TemplateColumn Title="Storage">
+                        <CellTemplate>
+                            <MudText Typo="Typo.body2">@FormatBytes(context.Item.TotalStorageBytes)</MudText>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <PropertyColumn Property="x => x.CompletedDownloads" Title="Done" />
+                    <PropertyColumn Property="x => x.FailedDownloads" Title="Failed" />
+                    <TemplateColumn Title="Last Active">
+                        <CellTemplate>
+                            <MudText Typo="Typo.body2">@(context.Item.LastActive?.ToString("yyyy-MM-dd") ?? "Never")</MudText>
+                        </CellTemplate>
+                    </TemplateColumn>
+                    <TemplateColumn Title="">
+                        <CellTemplate>
+                            <MudButton Variant="Variant.Text"
+                                       Size="Size.Small"
+                                       OnClick="() => ShowUserDetails(context.Item)">
+                                Detail
+                            </MudButton>
+                        </CellTemplate>
+                    </TemplateColumn>
+                </Columns>
+            </MudDataGrid>
+        </MudPaper>
+    }
+}
+
+@if (_showUserDialog && _selectedUser is not null)
+{
+    <MudDialog @bind-Visible="_showUserDialog">
+        <TitleContent>
+            <MudText Typo="Typo.h6">User Details: @_selectedUser.UserId</MudText>
+        </TitleContent>
+        <DialogContent>
+            <MudGrid Class="mb-4">
+                <MudItem xs="4">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.h5" Color="Color.Primary">@_selectedUser.TotalDownloads</MudText>
+                        <MudText Typo="Typo.caption">Total</MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="4">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.h5" Color="Color.Success">@FormatBytes(_selectedUser.TotalStorageBytes)</MudText>
+                        <MudText Typo="Typo.caption">Storage</MudText>
+                    </MudStack>
+                </MudItem>
+                <MudItem xs="4">
+                    <MudStack AlignItems="AlignItems.Center">
+                        <MudText Typo="Typo.h5" Color="Color.Info">@GetUserSuccessRate(_selectedUser)</MudText>
+                        <MudText Typo="Typo.caption">Success</MudText>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+
+            @if (_selectedUser.TopArtists.Count > 0)
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Top Artists</MudText>
+                <MudSimpleTable Hover Striped Dense>
+                    <tbody>
+                        @foreach (var artist in _selectedUser.TopArtists.Take(5))
+                        {
+                            <tr>
+                                <td>@artist.Key</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small">@artist.Value downloads</MudChip>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="CloseUserDialog">Close</MudButton>
+        </DialogActions>
+    </MudDialog>
+}
