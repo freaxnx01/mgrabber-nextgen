@@ -140,6 +140,7 @@ app.MapQuotaEndpoints();
 app.MapIdentityEndpoints();
 app.MapAdminEndpoints();
 
-// SignalR Hub (registered in Task 6.3)
+// SignalR Hub
+app.MapHub<MusicGrabber.Host.Hubs.DownloadHub>("/hubs/download");
 
 app.Run();
