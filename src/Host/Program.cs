@@ -15,6 +15,7 @@ using MusicGrabber.Shared;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Scalar.AspNetCore;
+using MusicGrabber.Host.Endpoints;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -131,7 +132,14 @@ app.UseAntiforgery();
 // app.MapRazorComponents<MusicGrabber.Frontend.Components.App>()
 //     .AddInteractiveServerRenderMode();
 
-// API Endpoints (registered in Task 6.2)
+// API Endpoints
+app.MapDownloadEndpoints();
+app.MapDiscoveryEndpoints();
+app.MapRadioEndpoints();
+app.MapQuotaEndpoints();
+app.MapIdentityEndpoints();
+app.MapAdminEndpoints();
+
 // SignalR Hub (registered in Task 6.3)
 
 app.Run();
