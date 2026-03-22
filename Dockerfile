@@ -65,8 +65,9 @@ COPY --from=build /app/publish .
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-# Errata #28: ensure volume mount points are writable by appuser
-RUN mkdir -p /data /storage && chown appuser:appuser /data /storage
+# Ensure volume mount points exist and are writable by appuser
+# (must come after adduser above)
+RUN mkdir -p /data /storage && chown -R appuser:appgroup /data /storage
 
 USER appuser
 
