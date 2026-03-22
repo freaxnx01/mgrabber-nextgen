@@ -10,16 +10,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup .NET 10 Preview
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-          dotnet-quality: 'preview'
 
       - name: Restore dependencies
         run: dotnet restore
@@ -63,70 +62,40 @@ jobs:
             echo "::warning::Code coverage ($COVERAGE%) is below threshold (60%)"
           fi
 
-      - name: Publish Frontend
+      - name: Publish Host
         run: |
-          dotnet publish src/Frontend/Frontend.csproj \
+          dotnet publish src/Host/Host.csproj \
             -c Release \
-            -o ./publish/frontend \
-            --no-restore \
-            --self-contained false
-
-      - name: Publish API
-        run: |
-          dotnet publish src/DownloadApi/DownloadApi.csproj \
-            -c Release \
-            -o ./publish/api \
+            -o ./publish/host \
             --no-restore \
             --self-contained false
 
       - name: Create release archives
         run: |
-          cd publish
-          tar -czf ../frontend-release-${{ github.sha }}.tar.gz frontend/
-          tar -czf ../api-release-${{ github.sha }}.tar.gz api/
-          cd ..
-          zip -r frontend-release-${{ github.sha }}.zip publish/frontend/
-          zip -r api-release-${{ github.sha }}.zip publish/api/
+          tar -czf host-release-${{ github.sha }}.tar.gz -C publish host/
+          zip -r host-release-${{ github.sha }}.zip publish/host/
 
-      - name: Upload Frontend artifact (tar.gz)
+      - name: Upload Host artifact (tar.gz)
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-release-tar
-          path: frontend-release-${{ github.sha }}.tar.gz
+          name: host-release-tar
+          path: host-release-${{ github.sha }}.tar.gz
           retention-days: 30
 
-      - name: Upload API artifact (tar.gz)
+      - name: Upload Host artifact (zip)
         uses: actions/upload-artifact@v4
         with:
-          name: api-release-tar
-          path: api-release-${{ github.sha }}.tar.gz
-          retention-days: 30
-
-      - name: Upload Frontend artifact (zip)
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-release-zip
-          path: frontend-release-${{ github.sha }}.zip
-          retention-days: 30
-
-      - name: Upload API artifact (zip)
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-release-zip
-          path: api-release-${{ github.sha }}.zip
+          name: host-release-zip
+          path: host-release-${{ github.sha }}.zip
           retention-days: 30
 
       - name: Create release notes
         run: |
-          echo "## 📦 Build Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Frontend" >> $GITHUB_STEP_SUMMARY
-          echo "- Tarball: \`frontend-release-${{ github.sha }}.tar.gz\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ZIP: \`frontend-release-${{ github.sha }}.zip\`" >> $GITHUB_STEP_SUMMARY
+          echo "### Host" >> $GITHUB_STEP_SUMMARY
+          echo "- Tarball: \`host-release-${{ github.sha }}.tar.gz\`" >> $GITHUB_STEP_SUMMARY
+          echo "- ZIP: \`host-release-${{ github.sha }}.zip\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### API" >> $GITHUB_STEP_SUMMARY
-          echo "- Tarball: \`api-release-${{ github.sha }}.tar.gz\`" >> $GITHUB_STEP_SUMMARY
-          echo "- ZIP: \`api-release-${{ github.sha }}.zip\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 📊 Code Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "## Code Coverage" >> $GITHUB_STEP_SUMMARY
           cat coveragereport/SummaryGithub.md >> $GITHUB_STEP_SUMMARY

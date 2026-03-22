@@ -15,8 +15,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  FRONTEND_IMAGE: ${{ github.repository }}/frontend
-  API_IMAGE: ${{ github.repository }}/api
+  IMAGE: ${{ github.repository }}
 
 jobs:
   build:
@@ -41,11 +40,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (Frontend)
-        id: meta-frontend
+      - name: Extract metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -53,98 +52,49 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=,suffix=,format=short
 
-      - name: Extract metadata (API)
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=,suffix=,format=short
-
-      - name: Build and push Frontend image
-        id: build-frontend
+      - name: Build and push image
+        id: build
         uses: docker/build-push-action@v5
         with:
-          context: ./src/Frontend
+          context: .
+          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
 
-      - name: Build and push API image
-        id: build-api
-        uses: docker/build-push-action@v5
-        with:
-          context: ./src/DownloadApi
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
-
-      - name: Generate artifact attestation (Frontend)
+      - name: Generate artifact attestation
         if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}
-          subject-digest: ${{ steps.build-frontend.outputs.digest }}
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
-      - name: Generate artifact attestation (API)
-        if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
-          subject-digest: ${{ steps.build-api.outputs.digest }}
-          push-to-registry: true
-
-      - name: Export Docker images as artifacts
+      - name: Export Docker image as artifact
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         run: |
-          docker build -t frontend:${{ github.sha }} ./src/Frontend
-          docker build -t api:${{ github.sha }} ./src/DownloadApi
-          docker save frontend:${{ github.sha }} > frontend-${{ github.sha }}.tar
-          docker save api:${{ github.sha }} > api-${{ github.sha }}.tar
-          gzip frontend-${{ github.sha }}.tar
-          gzip api-${{ github.sha }}.tar
+          docker build -t host:${{ github.sha }} -f ./Dockerfile .
+          docker save host:${{ github.sha }} | gzip > host-${{ github.sha }}.tar.gz
 
-      - name: Upload Frontend artifact
+      - name: Upload image artifact
         if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-docker-image-${{ github.sha }}
-          path: frontend-${{ github.sha }}.tar.gz
+          name: host-docker-image-${{ github.sha }}
+          path: host-${{ github.sha }}.tar.gz
           retention-days: 7
 
-      - name: Upload API artifact
-        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-docker-image-${{ github.sha }}
-          path: api-${{ github.sha }}.tar.gz
-          retention-days: 7
-
-      - name: Output image URLs
+      - name: Output image URL
         run: |
-          echo "## 🐳 Docker Images Built" >> $GITHUB_STEP_SUMMARY
+          echo "## Docker Image Built" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Frontend" >> $GITHUB_STEP_SUMMARY
-          echo "- Image: \`${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Digest: \`${{ steps.build-frontend.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Image: \`${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Digest: \`${{ steps.build.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### API" >> $GITHUB_STEP_SUMMARY
-          echo "- Image: \`${{ env.REGISTRY }}/${{ env.API_IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Digest: \`${{ steps.build-api.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Pull Commands" >> $GITHUB_STEP_SUMMARY
+          echo "### Pull Command" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ${{ env.REGISTRY }}/${{ env.API_IMAGE }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
