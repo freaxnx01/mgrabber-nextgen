@@ -52,9 +52,10 @@ builder.Services.AddHealthChecks()
 // SignalR
 builder.Services.AddSignalR();
 
-// Hangfire
+// Hangfire — Hangfire.Storage.SQLite uses sqlite-net-pcl which expects a file path, not a connection string
+var hangfireDbPath = connectionString.Replace("Data Source=", "").Replace("data source=", "").Trim();
 builder.Services.AddHangfire(config =>
-    config.UseSQLiteStorage(connectionString));
+    config.UseSQLiteStorage(hangfireDbPath));
 builder.Services.AddHangfireServer(options =>
 {
     options.WorkerCount = 9;
