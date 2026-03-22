@@ -265,6 +265,11 @@ Skill files: `.ai/skills/ui-brainstorm.md`, `ui-flow.md`, `ui-build.md`, `ui-rev
 | `ConnectionStrings__Default` | DB connection string | Yes |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector | No (local) |
 | `Serilog__MinimumLevel` | Log level override | No |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | Yes (for Google login) |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | Yes (for Google login) |
+| `AUTHENTIK_AUTHORITY` | Authentik OIDC authority URL | No (defaults to `https://auth.home.freaxnx01.ch/application/o/musicgrabber/`) |
+| `AUTHENTIK_CLIENT_ID` | Authentik OIDC client ID | Yes (for Authentik login) |
+| `AUTHENTIK_CLIENT_SECRET` | Authentik OIDC client secret | Yes (for Authentik login) |
 
 Never add secrets to `appsettings.json`. Use environment variables or Docker secrets.
 

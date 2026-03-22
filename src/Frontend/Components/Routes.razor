@@ -1,6 +1,35 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
+<Router AppAssembly="typeof(Routes).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
+            <NotAuthorized>
+                @if (context.User.Identity?.IsAuthenticated != true)
+                {
+                    <RedirectToLogin />
+                }
+                else
+                {
+                    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+                        <MudPaper Elevation="4" Class="pa-8 d-flex flex-column align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Block" Size="Size.Large" Color="Color.Error" />
+                            <MudText Typo="Typo.h5" Class="mt-4">Access Denied</MudText>
+                            <MudText Typo="Typo.body2" Class="mt-2">You do not have permission to access this page.</MudText>
+                        </MudPaper>
+                    </MudContainer>
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(MainLayout)">
+            <MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+                <MudPaper Elevation="4" Class="pa-8 d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Warning" />
+                    <MudText Typo="Typo.h5" Class="mt-4">Page Not Found</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2">The page you requested could not be found.</MudText>
+                    <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4">Go Home</MudButton>
+                </MudPaper>
+            </MudContainer>
+        </LayoutView>
+    </NotFound>
 </Router>

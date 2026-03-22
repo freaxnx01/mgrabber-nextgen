@@ -1,0 +1,13 @@
+@if (IsLoading)
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="48px" />
+}
+else if (Stations is { Count: > 0 })
+{
+    <MudToggleGroup T="string" Value="SelectedStation" ValueChanged="OnStationChanged" Color="Color.Primary">
+        @foreach (var station in Stations)
+        {
+            <MudToggleItem Value="@station.Id" Text="@station.Name" />
+        }
+    </MudToggleGroup>
+}

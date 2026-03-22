@@ -1,0 +1,26 @@
+@if (Quota is not null)
+{
+    <MudStack Spacing="1">
+        <MudProgressLinear Value="PercentUsed"
+                           Color="GetThresholdColor()"
+                           Rounded
+                           Size="Size.Large">
+            <MudText Typo="Typo.caption">@PercentUsed.ToString("F0")%</MudText>
+        </MudProgressLinear>
+        <MudStack Row Justify="Justify.SpaceBetween">
+            <MudText Typo="Typo.caption">
+                @FormatBytes(Quota.UsedBytes) / @FormatBytes(Quota.QuotaBytes)
+            </MudText>
+            @if (EstimatedBytes > 0)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Estimated: @FormatBytes(EstimatedBytes)
+                </MudText>
+            }
+        </MudStack>
+    </MudStack>
+}
+else
+{
+    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="24px" />
+}

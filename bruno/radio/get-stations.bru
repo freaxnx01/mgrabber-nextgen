@@ -1,0 +1,16 @@
+meta {
+  name: Get Radio Stations
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/radio/stations
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}

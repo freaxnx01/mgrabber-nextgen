@@ -1,0 +1,13 @@
+@page "/logout"
+@layout EmptyLayout
+
+<MudThemeProvider />
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="height: 100vh;">
+    <MudPaper Elevation="4" Class="pa-8 d-flex flex-column align-center" Style="max-width: 400px; width: 100%;">
+        <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Large" Color="Color.Secondary" />
+        <MudText Typo="Typo.h5" Class="mt-4">Logging out...</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">You are being signed out.</MudText>
+        <MudProgressCircular Color="Color.Primary" Indeterminate Class="mt-4" />
+    </MudPaper>
+</MudContainer>

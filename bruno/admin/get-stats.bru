@@ -1,0 +1,17 @@
+meta {
+  name: Get Admin Stats
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/admin/stats
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.totalDownloads: isDefined
+  res.body.totalUsers: isDefined
+}

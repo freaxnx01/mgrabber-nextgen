@@ -1,0 +1,169 @@
+@page "/musicbrainz"
+@attribute [Authorize]
+
+<MudText Typo="Typo.h4" Class="mb-1">MusicBrainz Search</MudText>
+<MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">Search artists, tracks, albums — download from YouTube</MudText>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudTextField @bind-Value="_searchQuery"
+                  Label="Search for artist, track, or album..."
+                  Variant="Variant.Outlined"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Search"
+                  Class="mb-3" />
+
+    <MudToggleGroup T="string" @bind-Value="_searchType" Color="Color.Primary" Class="mb-3">
+        <MudToggleItem Value="@SearchTypeArtist" Text="Artist" />
+        <MudToggleItem Value="@SearchTypeTrack" Text="Track" />
+        <MudToggleItem Value="@SearchTypeAlbum" Text="Album" />
+    </MudToggleGroup>
+
+    <MudStack Row Spacing="2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchAsync" Disabled="_isSearching">
+            Search
+        </MudButton>
+        <MudButton Variant="Variant.Text" OnClick="ClearResults">Clear</MudButton>
+    </MudStack>
+</MudPaper>
+
+@if (_isSearching)
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Spacing="2">
+            @for (var i = 0; i < 3; i++)
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="60px" />
+            }
+        </MudStack>
+    </MudPaper>
+}
+else if (HasResults)
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+            <MudText Typo="Typo.h6">Results for '@_searchQuery'</MudText>
+            <MudChip T="string" Color="Color.Info" Size="Size.Small">@ResultCount found</MudChip>
+        </MudStack>
+
+        @if (_searchType == SearchTypeArtist && _artists is { Count: > 0 })
+        {
+            <MudList T="string">
+                @foreach (var artist in _artists)
+                {
+                    <MudListItem>
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="w-100">
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.subtitle1">@artist.Name</MudText>
+                                <MudStack Row Spacing="1">
+                                    @if (!string.IsNullOrEmpty(artist.Country))
+                                    {
+                                        <MudChip T="string" Size="Size.Small">@artist.Country</MudChip>
+                                    }
+                                    @if (!string.IsNullOrEmpty(artist.Type))
+                                    {
+                                        <MudChip T="string" Size="Size.Small">@artist.Type</MudChip>
+                                    }
+                                    @if (!string.IsNullOrEmpty(artist.Disambiguation))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@artist.Disambiguation</MudText>
+                                    }
+                                </MudStack>
+                            </MudStack>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.OndemandVideo"
+                                       OnClick="@(() => SearchYouTubeForAsync(artist.Name))">
+                                YouTube
+                            </MudButton>
+                        </MudStack>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        }
+
+        @if (_searchType == SearchTypeTrack && _tracks is { Count: > 0 })
+        {
+            <MudList T="string">
+                @foreach (var track in _tracks)
+                {
+                    <MudListItem>
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="w-100">
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.subtitle1">@track.Title</MudText>
+                                <MudStack Row Spacing="1">
+                                    @if (!string.IsNullOrEmpty(track.ArtistCredit))
+                                    {
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@track.ArtistCredit</MudText>
+                                    }
+                                    @if (!string.IsNullOrEmpty(track.FormattedDuration))
+                                    {
+                                        <MudChip T="string" Size="Size.Small">@track.FormattedDuration</MudChip>
+                                    }
+                                </MudStack>
+                            </MudStack>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.OndemandVideo"
+                                       OnClick="@(() => SearchYouTubeForTrackAsync(track))">
+                                YouTube
+                            </MudButton>
+                        </MudStack>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        }
+
+        @if (_searchType == SearchTypeAlbum && _releases is { Count: > 0 })
+        {
+            <MudList T="string">
+                @foreach (var release in _releases)
+                {
+                    <MudListItem>
+                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="w-100">
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.subtitle1">@release.Title</MudText>
+                                <MudStack Row Spacing="1">
+                                    @if (!string.IsNullOrEmpty(release.ArtistCredit))
+                                    {
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">@release.ArtistCredit</MudText>
+                                    }
+                                    @if (!string.IsNullOrEmpty(release.Date))
+                                    {
+                                        <MudChip T="string" Size="Size.Small">@release.Date</MudChip>
+                                    }
+                                    @if (!string.IsNullOrEmpty(release.Country))
+                                    {
+                                        <MudChip T="string" Size="Size.Small">@release.Country</MudChip>
+                                    }
+                                </MudStack>
+                            </MudStack>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.OndemandVideo"
+                                       OnClick="@(() => SearchYouTubeForReleaseAsync(release))">
+                                YouTube
+                            </MudButton>
+                        </MudStack>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        }
+    </MudPaper>
+}
+
+@if (_youTubeResults is not null)
+{
+    <MudPaper Class="pa-4">
+        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+            <MudText Typo="Typo.h6">YouTube Results for '@_youTubeQuery'</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="CloseYouTubeResults" />
+        </MudStack>
+        <YouTubeResultsList Results="_youTubeResults"
+                            IsLoading="_isSearchingYouTube"
+                            OnDownload="DownloadDefaultAsync"
+                            OnDownloadWithFormat="DownloadWithFormatAsync" />
+    </MudPaper>
+}

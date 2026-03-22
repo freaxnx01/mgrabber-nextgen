@@ -1,0 +1,30 @@
+@if (Jobs is { Count: > 0 })
+{
+    <MudStack Spacing="2">
+        @foreach (var job in Jobs)
+        {
+            <MudPaper Class="pa-3" Outlined>
+                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.subtitle2">@(job.Title ?? "Unknown")</MudText>
+                    <MudChip T="string"
+                             Color="GetStatusColor(job.Status)"
+                             Size="Size.Small">
+                        @job.Status
+                    </MudChip>
+                </MudStack>
+                <MudProgressLinear Value="job.Progress"
+                                   Color="GetProgressColor(job.Status)"
+                                   Striped="IsActive(job.Status)"
+                                   Class="mt-2">
+                    <MudText Typo="Typo.caption">@job.Progress%</MudText>
+                </MudProgressLinear>
+            </MudPaper>
+        }
+    </MudStack>
+}
+else
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="pa-4">
+        No active downloads.
+    </MudText>
+}

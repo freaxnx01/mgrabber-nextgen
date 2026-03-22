@@ -1,0 +1,142 @@
+@page "/profile"
+@attribute [Authorize]
+
+<MudText Typo="Typo.h4" Class="mb-4">My Profile</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">Account</MudText>
+            @if (_profile is not null)
+            {
+                <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                    <MudAvatar Color="Color.Primary" Size="Size.Large">
+                        @GetInitials(_profile.Name)
+                    </MudAvatar>
+                    <MudText Typo="Typo.subtitle1">@_profile.Name</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@_profile.Email</MudText>
+                    <MudChip T="string" Color="Color.Primary" Size="Size.Small">@_profile.Role</MudChip>
+                    <MudText Typo="Typo.caption">Since: @_profile.CreatedAt.ToString("yyyy-MM-dd")</MudText>
+                </MudStack>
+            }
+            else
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Circle" Width="64px" Height="64px" />
+                <MudSkeleton Width="150px" />
+            }
+        </MudPaper>
+
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-3">Storage</MudText>
+            <QuotaIndicator Quota="_quota" />
+            @if (_quota is not null)
+            {
+                <MudText Typo="Typo.caption" Class="mt-2">@_quota.FileCount files</MudText>
+                <MudText Typo="Typo.caption">@FormatBytes(_quota.QuotaBytes - _quota.UsedBytes) remaining</MudText>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        @if (_stats is not null)
+        {
+            <MudPaper Class="pa-4 mb-4">
+                <MudGrid>
+                    <MudItem xs="4">
+                        <MudStack AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.h4" Color="Color.Primary">@_stats.TotalDownloads</MudText>
+                            <MudText Typo="Typo.caption">Total</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudStack AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.h4" Color="Color.Success">@_stats.CompletedDownloads</MudText>
+                            <MudText Typo="Typo.caption">Done</MudText>
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudStack AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.h4" Color="Color.Info">@ActiveDownloads</MudText>
+                            <MudText Typo="Typo.caption">Active</MudText>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+
+        <MudPaper Class="pa-4 mb-4">
+            <MudText Typo="Typo.h6" Class="mb-3">Settings</MudText>
+            @if (_settings is not null)
+            {
+                <MudForm>
+                    <MudSelect T="string" @bind-Value="_settings.DefaultFormat" Label="Default Format" Variant="Variant.Outlined" Class="mb-3">
+                        <MudSelectItem Value="@("Mp3")">MP3</MudSelectItem>
+                        <MudSelectItem Value="@("Flac")">FLAC</MudSelectItem>
+                        <MudSelectItem Value="@("M4a")">M4A</MudSelectItem>
+                        <MudSelectItem Value="@("WebM")">WebM</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSwitch @bind-Value="_settings.EnableNormalization" Color="Color.Primary" Label="Normalize Audio" Class="mb-3" />
+
+                    @if (_settings.EnableNormalization)
+                    {
+                        <MudSlider T="int" @bind-Value="_settings.NormalizationLufs"
+                                   Min="-20" Max="-10" Step="1"
+                                   Class="mb-3">
+                            Target: @_settings.NormalizationLufs LUFS
+                        </MudSlider>
+                    }
+
+                    <MudSwitch @bind-Value="_settings.EmailNotifications" Color="Color.Primary" Label="Email Notifications" Class="mb-3" />
+
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveSettingsAsync" Disabled="_isSaving">
+                        Save Settings
+                    </MudButton>
+                </MudForm>
+            }
+            else
+            {
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+            }
+        </MudPaper>
+
+        @if (_stats is not null)
+        {
+            <MudPaper Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Activity</MudText>
+
+                @if (_stats.TopArtists.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Top Artists</MudText>
+                    <MudSimpleTable Hover Striped Dense Class="mb-4">
+                        <tbody>
+                            @foreach (var artist in _stats.TopArtists.Take(5))
+                            {
+                                <tr>
+                                    <td>@artist.Key</td>
+                                    <td>@artist.Value downloads</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+
+                @if (_stats.DownloadsPerDay.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Downloads (30 days)</MudText>
+                    <MudSimpleTable Hover Striped Dense>
+                        <tbody>
+                            @foreach (var day in _stats.DownloadsPerDay.Take(10))
+                            {
+                                <tr>
+                                    <td>@day.Key</td>
+                                    <td>@day.Value</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudPaper>
+        }
+    </MudItem>
+</MudGrid>
