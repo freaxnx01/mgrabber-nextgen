@@ -79,17 +79,22 @@ builder.Services.AddDownloadModule(builder.Configuration);
 // Frontend Services
 builder.Services.AddFrontendServices();
 
-// Google OAuth + Authentik OIDC
-builder.Services.AddAuthentication()
+// Google OAuth + optional Authentik OIDC
+var authBuilder = builder.Services.AddAuthentication()
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["GOOGLE_CLIENT_ID"] ?? "";
         options.ClientSecret = builder.Configuration["GOOGLE_CLIENT_SECRET"] ?? "";
-    })
-    .AddOpenIdConnect("Authentik", "Authentik", options =>
+    });
+
+// Only register Authentik if client ID is configured
+var authentikClientId = builder.Configuration["AUTHENTIK_CLIENT_ID"];
+if (!string.IsNullOrEmpty(authentikClientId))
+{
+    authBuilder.AddOpenIdConnect("Authentik", "Authentik", options =>
     {
         options.Authority = builder.Configuration["AUTHENTIK_AUTHORITY"] ?? "https://auth.home.freaxnx01.ch/application/o/musicgrabber/";
-        options.ClientId = builder.Configuration["AUTHENTIK_CLIENT_ID"] ?? "";
+        options.ClientId = authentikClientId;
         options.ClientSecret = builder.Configuration["AUTHENTIK_CLIENT_SECRET"] ?? "";
         options.ResponseType = "code";
         options.SaveTokens = true;
@@ -103,6 +108,7 @@ builder.Services.AddAuthentication()
         options.ClaimActions.MapJsonKey(System.Security.Claims.ClaimTypes.Email, "email");
         options.ClaimActions.MapJsonKey(System.Security.Claims.ClaimTypes.Name, "name");
     });
+}
 
 // CORS
 builder.Services.AddCors(options =>
