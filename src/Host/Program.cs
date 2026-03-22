@@ -1,5 +1,7 @@
 using Hangfire;
 using Hangfire.Storage.SQLite;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -76,12 +78,29 @@ builder.Services.AddDownloadModule(builder.Configuration);
 // Frontend Services
 builder.Services.AddFrontendServices();
 
-// Google OAuth
+// Google OAuth + Authentik OIDC
 builder.Services.AddAuthentication()
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["GOOGLE_CLIENT_ID"] ?? "";
         options.ClientSecret = builder.Configuration["GOOGLE_CLIENT_SECRET"] ?? "";
+    })
+    .AddOpenIdConnect("Authentik", "Authentik", options =>
+    {
+        options.Authority = builder.Configuration["AUTHENTIK_AUTHORITY"] ?? "https://auth.home.freaxnx01.ch/application/o/musicgrabber/";
+        options.ClientId = builder.Configuration["AUTHENTIK_CLIENT_ID"] ?? "";
+        options.ClientSecret = builder.Configuration["AUTHENTIK_CLIENT_SECRET"] ?? "";
+        options.ResponseType = "code";
+        options.SaveTokens = true;
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.Scope.Add("openid");
+        options.Scope.Add("profile");
+        options.Scope.Add("email");
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters.NameClaimType = "name";
+        options.TokenValidationParameters.RoleClaimType = "groups";
+        options.ClaimActions.MapJsonKey(System.Security.Claims.ClaimTypes.Email, "email");
+        options.ClaimActions.MapJsonKey(System.Security.Claims.ClaimTypes.Name, "name");
     });
 
 // CORS
@@ -144,6 +163,29 @@ app.MapRadioEndpoints();
 app.MapQuotaEndpoints();
 app.MapIdentityEndpoints();
 app.MapAdminEndpoints();
+
+// Auth challenge endpoints
+app.MapGet("/api/auth/google-login", (string? returnUrl, HttpContext ctx) =>
+{
+    var redirectUrl = returnUrl ?? "/";
+    return Results.Challenge(
+        new AuthenticationProperties { RedirectUri = redirectUrl },
+        ["Google"]);
+}).AllowAnonymous();
+
+app.MapGet("/api/auth/authentik-login", (string? returnUrl, HttpContext ctx) =>
+{
+    var redirectUrl = returnUrl ?? "/";
+    return Results.Challenge(
+        new AuthenticationProperties { RedirectUri = redirectUrl },
+        ["Authentik"]);
+}).AllowAnonymous();
+
+app.MapGet("/api/auth/logout", async (HttpContext ctx) =>
+{
+    await ctx.SignOutAsync();
+    return Results.Redirect("/login");
+}).AllowAnonymous();
 
 // SignalR Hub
 app.MapHub<MusicGrabber.Host.Hubs.DownloadHub>("/hubs/download");
