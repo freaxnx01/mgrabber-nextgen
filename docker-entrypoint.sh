@@ -2,7 +2,7 @@
 set -e
 
 echo "Running EF Core migrations..."
-dotnet MusicGrabber.Host.dll --migrate
+dotnet Host.dll --migrate
 
 echo "Starting MusicGrabber..."
-exec dotnet MusicGrabber.Host.dll
+exec dotnet Host.dll
