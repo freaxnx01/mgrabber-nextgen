@@ -30,8 +30,8 @@ COPY src/Modules/Identity/Domain/Identity.Domain.csproj src/Modules/Identity/Dom
 COPY src/Modules/Identity/Application/Identity.Application.csproj src/Modules/Identity/Application/
 COPY src/Modules/Identity/Infrastructure/Identity.Infrastructure.csproj src/Modules/Identity/Infrastructure/
 
-# Restore NuGet packages
-RUN dotnet restore MusicGrabber.sln
+# Restore NuGet packages (Host project only — excludes test projects)
+RUN dotnet restore src/Host/Host.csproj
 
 # Copy all source files
 COPY src/ src/
