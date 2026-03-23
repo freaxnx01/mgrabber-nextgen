@@ -140,6 +140,13 @@ if (args.Contains("--migrate"))
 }
 
 // Middleware
+// Forwarded headers — required behind reverse proxy (Traefik) so OAuth
+// redirect URIs use https:// instead of http://
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
 app.UseSerilogRequestLogging();
 app.UseCors();
 app.UseAuthentication();
