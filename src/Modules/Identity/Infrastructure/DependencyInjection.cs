@@ -36,6 +36,21 @@ public static class DependencyInjection
             options.LoginPath = "/login";
             options.LogoutPath = "/logout";
             options.AccessDeniedPath = "/access-denied";
+            // When user is authenticated (Google/Authentik) but not whitelisted,
+            // the auth middleware redirects to LoginPath. Intercept: if already
+            // authenticated, send to AccessDenied instead of login loop.
+            options.Events.OnRedirectToLogin = context =>
+            {
+                if (context.HttpContext.User.Identity?.IsAuthenticated == true)
+                {
+                    context.Response.Redirect("/access-denied");
+                }
+                else
+                {
+                    context.Response.Redirect(context.RedirectUri);
+                }
+                return Task.CompletedTask;
+            };
         });
 
         // Repositories (driven ports)
