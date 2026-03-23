@@ -1,9 +1,10 @@
 .PHONY: build run watch test test-unit test-integration coverage \
-       docker-run up down logs rebuild deploy-test \
+       docker-run up down logs rebuild deploy-test push-image \
        migrate migration-add lint outdated vuln clean help
 
 IMAGE_NAME := musicgrabber
 IMAGE_TAG := local
+GHCR_IMAGE := ghcr.io/freaxnx01/mgrabber-nextgen:main
 
 COMPOSE := docker compose -f docker-compose.yml -f docker-compose.override.yml
 HOST_PROJECT := src/Host/Host.csproj
@@ -55,6 +56,10 @@ logs: ## Follow container logs
 	$(COMPOSE) logs -f
 
 rebuild: down up ## Rebuild and restart
+
+push-image: ## Build and push Docker image to GHCR (skips CI)
+	docker build -t $(GHCR_IMAGE) .
+	docker push $(GHCR_IMAGE)
 
 deploy-test: ## Build image and verify it starts + responds to health check
 	@echo "── Building Docker image..."
