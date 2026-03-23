@@ -30,6 +30,14 @@ public static class DependencyInjection
             .AddEntityFrameworkStores<IdentityDbContext>()
             .AddDefaultTokenProviders();
 
+        // Configure cookie paths — default is /Account/Login which doesn't exist
+        services.ConfigureApplicationCookie(options =>
+        {
+            options.LoginPath = "/login";
+            options.LogoutPath = "/logout";
+            options.AccessDeniedPath = "/access-denied";
+        });
+
         // Repositories (driven ports)
         services.AddScoped<IWhitelistRepository, WhitelistRepository>();
         services.AddScoped<IUserSettingsRepository, UserSettingsRepository>();
