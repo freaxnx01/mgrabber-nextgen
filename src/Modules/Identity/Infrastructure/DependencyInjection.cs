@@ -21,12 +21,12 @@ public static class DependencyInjection
         services.AddDbContext<IdentityDbContext>(options =>
             options.UseSqlite(connectionString));
 
-        // ASP.NET Core Identity
-        services.AddIdentityCore<ApplicationUser>(options =>
+        // ASP.NET Core Identity — AddIdentity (not AddIdentityCore) registers
+        // cookie authentication schemes needed for external OAuth providers
+        services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
                 options.SignIn.RequireConfirmedAccount = false;
             })
-            .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<IdentityDbContext>()
             .AddDefaultTokenProviders();
 

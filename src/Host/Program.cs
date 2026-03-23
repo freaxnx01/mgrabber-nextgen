@@ -80,7 +80,10 @@ builder.Services.AddDownloadModule(builder.Configuration);
 builder.Services.AddFrontendServices();
 
 // Google OAuth + optional Authentik OIDC
-var authBuilder = builder.Services.AddAuthentication()
+// Note: AddIdentity (in Identity module) already sets default scheme to cookies.
+// We only add external providers here — don't call AddAuthentication() again as it
+// would override the cookie defaults and cause infinite auth loops.
+builder.Services.AddAuthentication()
     .AddGoogle(options =>
     {
         options.ClientId = builder.Configuration["GOOGLE_CLIENT_ID"] ?? "";
@@ -91,7 +94,7 @@ var authBuilder = builder.Services.AddAuthentication()
 var authentikClientId = builder.Configuration["AUTHENTIK_CLIENT_ID"];
 if (!string.IsNullOrEmpty(authentikClientId))
 {
-    authBuilder.AddOpenIdConnect("Authentik", "Authentik", options =>
+    builder.Services.AddAuthentication().AddOpenIdConnect("Authentik", "Authentik", options =>
     {
         options.Authority = builder.Configuration["AUTHENTIK_AUTHORITY"] ?? "https://auth.home.freaxnx01.ch/application/o/musicgrabber/";
         options.ClientId = authentikClientId;

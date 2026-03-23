@@ -1,6 +1,9 @@
 .PHONY: build run watch test test-unit test-integration coverage \
-       docker-run up down logs rebuild \
+       docker-run up down logs rebuild deploy-test \
        migrate migration-add lint outdated vuln clean help
+
+IMAGE_NAME := musicgrabber
+IMAGE_TAG := local
 
 COMPOSE := docker compose -f docker-compose.yml -f docker-compose.override.yml
 HOST_PROJECT := src/Host/Host.csproj
@@ -52,6 +55,40 @@ logs: ## Follow container logs
 	$(COMPOSE) logs -f
 
 rebuild: down up ## Rebuild and restart
+
+deploy-test: ## Build image and verify it starts + responds to health check
+	@echo "── Building Docker image..."
+	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
+	@echo "── Starting container..."
+	docker rm -f mgrabber-deploy-test 2>/dev/null || true
+	docker run -d --name mgrabber-deploy-test \
+		-p 18080:8080 \
+		-e ConnectionStrings__Default="Data Source=/data/musicgrabber.db" \
+		-e GOOGLE_CLIENT_ID=test \
+		-e GOOGLE_CLIENT_SECRET=test \
+		-v /tmp/mgrabber-test-data:/data \
+		-v /tmp/mgrabber-test-storage:/storage \
+		$(IMAGE_NAME):$(IMAGE_TAG)
+	@echo "── Waiting for startup..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		sleep 2; \
+		STATUS=$$(curl -sk -o /dev/null -w '%{http_code}' http://localhost:18080/health/live 2>/dev/null); \
+		if [ "$$STATUS" = "200" ] || [ "$$STATUS" = "500" ]; then \
+			echo "── Container responding (HTTP $$STATUS)"; \
+			break; \
+		fi; \
+		echo "── Waiting... (attempt $$i)"; \
+	done
+	@STATUS=$$(curl -sk -o /dev/null -w '%{http_code}' http://localhost:18080/health/live 2>/dev/null); \
+	docker logs mgrabber-deploy-test 2>&1 | tail -5; \
+	docker rm -f mgrabber-deploy-test > /dev/null 2>&1; \
+	rm -rf /tmp/mgrabber-test-data /tmp/mgrabber-test-storage; \
+	if [ "$$STATUS" = "200" ]; then \
+		echo "── PASS: Health check returned 200"; \
+	else \
+		echo "── FAIL: Health check returned $$STATUS"; \
+		exit 1; \
+	fi
 
 # ── Database ─────────────────────────────────────────────────────────────────
 
