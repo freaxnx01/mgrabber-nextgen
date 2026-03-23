@@ -142,11 +142,15 @@ if (args.Contains("--migrate"))
 // Middleware
 // Forwarded headers — required behind reverse proxy (Traefik) so OAuth
 // redirect URIs use https:// instead of http://
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
         | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-});
+};
+// Trust all proxies — Traefik connects from Docker network, not loopback
+forwardedHeadersOptions.KnownIPNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
 app.UseSerilogRequestLogging();
 app.UseCors();
 app.UseAuthentication();
