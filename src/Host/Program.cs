@@ -175,8 +175,7 @@ app.UseStaticFiles();
 app.UseAntiforgery();
 
 app.MapRazorComponents<MusicGrabber.Frontend.Components.App>()
-    .AddInteractiveServerRenderMode()
-    .AddAdditionalAssemblies(typeof(MusicGrabber.Frontend.Components.App).Assembly);
+    .AddInteractiveServerRenderMode();
 
 // API Endpoints
 app.MapDownloadEndpoints();
