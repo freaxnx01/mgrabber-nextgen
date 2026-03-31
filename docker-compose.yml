@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: musicgrabber
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     volumes:
       - data:/data
       - storage:/storage

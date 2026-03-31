@@ -2,6 +2,9 @@ using Hangfire;
 using Hangfire.Storage.SQLite;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using MusicGrabber.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -171,7 +174,7 @@ app.MapHangfireDashboard("/hangfire");
 app.MapPrometheusScrapingEndpoint("/metrics");
 
 // Static files & Blazor
-app.UseStaticFiles();
+app.MapStaticAssets();
 app.UseAntiforgery();
 
 app.MapRazorComponents<MusicGrabber.Frontend.Components.App>()
@@ -186,20 +189,88 @@ app.MapIdentityEndpoints();
 app.MapAdminEndpoints();
 
 // Auth challenge endpoints
-app.MapGet("/api/auth/google-login", (string? returnUrl, HttpContext ctx) =>
+app.MapGet("/api/auth/google-login", (string? returnUrl) =>
 {
-    var redirectUrl = returnUrl ?? "/";
+    var callbackUrl = $"/api/auth/external-callback?returnUrl={Uri.EscapeDataString(returnUrl ?? "/")}";
     return Results.Challenge(
-        new AuthenticationProperties { RedirectUri = redirectUrl },
+        new AuthenticationProperties { RedirectUri = callbackUrl },
         ["Google"]);
 }).AllowAnonymous();
 
-app.MapGet("/api/auth/authentik-login", (string? returnUrl, HttpContext ctx) =>
+app.MapGet("/api/auth/authentik-login", (string? returnUrl) =>
 {
-    var redirectUrl = returnUrl ?? "/";
+    var callbackUrl = $"/api/auth/external-callback?returnUrl={Uri.EscapeDataString(returnUrl ?? "/")}";
     return Results.Challenge(
-        new AuthenticationProperties { RedirectUri = redirectUrl },
+        new AuthenticationProperties { RedirectUri = callbackUrl },
         ["Authentik"]);
+}).AllowAnonymous();
+
+app.MapGet("/api/auth/external-callback", async (
+    string? returnUrl,
+    HttpContext httpContext,
+    SignInManager<ApplicationUser> signInManager,
+    UserManager<ApplicationUser> userManager,
+    ILogger<Program> logger) =>
+{
+    // Authenticate against the external cookie scheme directly
+    var authResult = await httpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
+    if (!authResult.Succeeded || authResult.Principal is null)
+    {
+        logger.LogWarning("External cookie authentication failed");
+        return Results.Redirect("/login");
+    }
+
+    var externalPrincipal = authResult.Principal;
+    var props = authResult.Properties?.Items;
+    var provider = (props is not null && props.TryGetValue("LoginProvider", out var lp) ? lp : null)
+        ?? externalPrincipal.Identity?.AuthenticationType ?? "Unknown";
+    var providerKey = externalPrincipal.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    var email = externalPrincipal.FindFirstValue(ClaimTypes.Email);
+
+    logger.LogInformation("External login from {Provider}, key={Key}, email={Email}", provider, providerKey, email);
+
+    if (string.IsNullOrWhiteSpace(email))
+    {
+        logger.LogWarning("No email claim found in external principal");
+        return Results.Redirect("/login");
+    }
+
+    // Try to sign in with existing external login
+    var result = await signInManager.ExternalLoginSignInAsync(provider, providerKey, isPersistent: true);
+
+    if (!result.Succeeded)
+    {
+        logger.LogInformation("ExternalLoginSignIn failed, creating user for {Email}", email);
+
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is null)
+        {
+            user = new ApplicationUser { Id = email, UserName = email, Email = email };
+            var createResult = await userManager.CreateAsync(user);
+            if (!createResult.Succeeded)
+            {
+                logger.LogError("Failed to create user: {Errors}",
+                    string.Join(", ", createResult.Errors.Select(e => e.Description)));
+                return Results.Redirect("/login");
+            }
+        }
+
+        var loginInfo = new UserLoginInfo(provider, providerKey, provider);
+        var addLoginResult = await userManager.AddLoginAsync(user, loginInfo);
+        if (!addLoginResult.Succeeded)
+        {
+            logger.LogError("Failed to add login: {Errors}",
+                string.Join(", ", addLoginResult.Errors.Select(e => e.Description)));
+        }
+
+        await signInManager.SignInAsync(user, isPersistent: true);
+    }
+
+    // Clean up external cookie
+    await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+
+    logger.LogInformation("User {Email} signed in successfully", email);
+    return Results.Redirect(returnUrl ?? "/");
 }).AllowAnonymous();
 
 app.MapGet("/api/auth/logout", async (HttpContext ctx) =>

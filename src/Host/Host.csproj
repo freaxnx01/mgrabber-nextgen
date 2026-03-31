@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <RootNamespace>MusicGrabber.Host</RootNamespace>
+    <!-- Required because App.razor lives in the Frontend RCL, not in this project.
+         Without this, the SDK won't include blazor.web.js in the publish output. -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="MudBlazor" />

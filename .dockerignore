@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.git/
+**/.vs/
+**/.vscode/
+**/.idea/
+**/coverage/
+**/TestResults/
+*.md
+!global.json
+.ai/
+.github/
+bruno/
+docs/
+tests/

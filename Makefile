@@ -1,6 +1,6 @@
 .PHONY: build run watch test test-unit test-integration coverage \
-       docker-run up down logs rebuild deploy-test push-image \
-       migrate migration-add lint outdated vuln clean help
+       docker-build docker-run up down logs rebuild deploy-test push-image \
+       migrate migration-add lint outdated vuln check-yt-key clean help
 
 IMAGE_NAME := musicgrabber
 IMAGE_TAG := local
@@ -60,6 +60,9 @@ rebuild: down up ## Rebuild and restart
 push-image: ## Build and push Docker image to GHCR (skips CI)
 	docker build -t $(GHCR_IMAGE) .
 	docker push $(GHCR_IMAGE)
+
+docker-build: ## Build Docker image
+	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 deploy-test: ## Build image and verify it starts + responds to health check
 	@echo "── Building Docker image..."
@@ -123,6 +126,40 @@ outdated: ## Check for outdated packages
 
 vuln: ## Check for vulnerable packages
 	dotnet list package --vulnerable --include-transitive
+
+# ── Verification ────────────────────────────────────────────────────────
+
+check-yt-key: .env ## Verify YouTube Data API v3 key is valid
+	@YOUTUBE_API_KEY=$$(grep -E '^YOUTUBE_API_KEY=' .env | cut -d= -f2-); \
+	if [ -z "$$YOUTUBE_API_KEY" ]; then \
+		echo "ERROR: YOUTUBE_API_KEY is empty in .env"; \
+		exit 1; \
+	fi; \
+	echo "── Testing YouTube Data API v3 key..."; \
+	BODY=$$(curl -s -w '\n%{http_code}' \
+		"https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=$$YOUTUBE_API_KEY"); \
+	RESPONSE=$$(echo "$$BODY" | tail -1); \
+	BODY=$$(echo "$$BODY" | sed '$$d'); \
+	if [ "$$RESPONSE" = "200" ]; then \
+		echo "── PASS: API key is valid (HTTP 200)"; \
+	elif [ "$$RESPONSE" = "403" ]; then \
+		REASON=$$(echo "$$BODY" | grep -o '"reason":"[^"]*"' | head -1 | cut -d'"' -f4); \
+		if [ "$$REASON" = "API_KEY_HTTP_REFERRER_BLOCKED" ]; then \
+			echo "── FAIL: API key has HTTP referrer restrictions in Google Cloud Console."; \
+			echo "         Server-side keys should use IP restrictions (or none), not referrer restrictions."; \
+			echo "         Fix at: https://console.cloud.google.com/apis/credentials"; \
+		else \
+			MSG=$$(echo "$$BODY" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4); \
+			echo "── FAIL: HTTP 403 — $$MSG"; \
+		fi; \
+		exit 1; \
+	elif [ "$$RESPONSE" = "400" ]; then \
+		echo "── FAIL: Bad request — key may be malformed (HTTP 400)"; \
+		exit 1; \
+	else \
+		echo "── FAIL: Unexpected response (HTTP $$RESPONSE)"; \
+		exit 1; \
+	fi
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 
