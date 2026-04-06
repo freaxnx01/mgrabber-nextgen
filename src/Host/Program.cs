@@ -12,6 +12,7 @@ using MusicGrabber.Modules.Download.Infrastructure;
 using MusicGrabber.Modules.Download.Infrastructure.Adapters.Persistence;
 using MusicGrabber.Modules.Discovery.Infrastructure;
 using MusicGrabber.Modules.Radio.Infrastructure;
+using MusicGrabber.Modules.Quota.Application.Ports.Driving;
 using MusicGrabber.Modules.Quota.Infrastructure;
 using MusicGrabber.Modules.Quota.Infrastructure.Adapters.Persistence;
 using MusicGrabber.Modules.Identity.Infrastructure;
@@ -31,6 +32,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Serilog
 builder.Host.UseSerilog((context, config) =>
     config.ReadFrom.Configuration(context.Configuration)
+        .MinimumLevel.Override("Hangfire.Storage.SQLite", Serilog.Events.LogEventLevel.Fatal)
         .WriteTo.Console());
 
 // MudBlazor
@@ -55,10 +57,13 @@ builder.Services.AddHealthChecks()
 // SignalR
 builder.Services.AddSignalR();
 
-// Hangfire — Hangfire.Storage.SQLite uses sqlite-net-pcl which expects a file path, not a connection string
+// Hangfire — separate DB to avoid SQLite lock contention with EF Core
 var hangfireDbPath = connectionString.Replace("Data Source=", "").Replace("data source=", "").Trim();
+var hangfireDir = Path.GetDirectoryName(hangfireDbPath);
+var hangfireFile = Path.GetFileNameWithoutExtension(hangfireDbPath) + "-hangfire" + Path.GetExtension(hangfireDbPath);
+var hangfireFullPath = string.IsNullOrEmpty(hangfireDir) ? hangfireFile : Path.Combine(hangfireDir, hangfireFile);
 builder.Services.AddHangfire(config =>
-    config.UseSQLiteStorage(hangfireDbPath));
+    config.UseSQLiteStorage(hangfireFullPath));
 builder.Services.AddHangfireServer(options =>
 {
     options.WorkerCount = 9;
@@ -129,17 +134,32 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// --migrate flag (Errata #27)
-if (args.Contains("--migrate"))
+// Apply pending migrations and enable WAL mode on SQLite
 {
     using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
     var downloadDb = scope.ServiceProvider.GetRequiredService<DownloadDbContext>();
-    await downloadDb.Database.MigrateAsync();
     var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-    await identityDb.Database.MigrateAsync();
     var quotaDb = scope.ServiceProvider.GetRequiredService<QuotaDbContext>();
-    await quotaDb.Database.MigrateAsync();
-    return;
+
+    var pending = (await downloadDb.Database.GetPendingMigrationsAsync()).Any()
+        || (await identityDb.Database.GetPendingMigrationsAsync()).Any()
+        || (await quotaDb.Database.GetPendingMigrationsAsync()).Any();
+
+    if (pending)
+    {
+        logger.LogInformation("Applying pending database migrations...");
+        await downloadDb.Database.MigrateAsync();
+        await identityDb.Database.MigrateAsync();
+        await quotaDb.Database.MigrateAsync();
+        logger.LogInformation("Migrations applied successfully");
+    }
+
+    await downloadDb.Database.ExecuteSqlRawAsync("PRAGMA journal_mode=WAL;");
+
+    if (args.Contains("--migrate"))
+        return;
 }
 
 // Middleware
@@ -269,6 +289,10 @@ app.MapGet("/api/auth/external-callback", async (
     // Clean up external cookie
     await httpContext.SignOutAsync(IdentityConstants.ExternalScheme);
 
+    // Ensure quota record exists (idempotent — skips if already present)
+    var quotaService = httpContext.RequestServices.GetRequiredService<IQuotaService>();
+    await quotaService.InitializeUserAsync(email);
+
     logger.LogInformation("User {Email} signed in successfully", email);
     return Results.Redirect(returnUrl ?? "/");
 }).AllowAnonymous();
@@ -315,6 +339,13 @@ eventBus.Subscribe<QuotaThresholdCrossedEvent>((evt, ct) =>
     var jobClient = scope.ServiceProvider.GetRequiredService<IBackgroundJobClient>();
     jobClient.Enqueue<SendQuotaEmailJob>(j => j.ExecuteAsync(evt.UserId, evt.Threshold));
     return Task.CompletedTask;
+});
+
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    var urls = string.Join(", ", app.Urls);
+    logger.LogInformation("MusicGrabber is ready — listening on {Urls}", urls);
 });
 
 app.Run();
