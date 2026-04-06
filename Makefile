@@ -1,4 +1,4 @@
-.PHONY: build run watch test test-unit test-integration coverage \
+.PHONY: build run watch stop test test-unit test-integration coverage \
        docker-build docker-run up down logs rebuild deploy-test push-image \
        migrate migration-add lint outdated vuln check-yt-key clean help
 
@@ -13,32 +13,45 @@ STARTUP_PROJECT := src/Host
 # ── Development ──────────────────────────────────────────────────────────────
 
 build: ## Build solution in Release mode
-	dotnet build -c Release
+	$(call tee_log,dotnet build -c Release)
 
-run: ## Run Host locally (no Docker)
-	dotnet run --project $(HOST_PROJECT)
+stop: ## Stop docker-compose and free port 8086
+	@$(COMPOSE) down 2>/dev/null || true
+	@PID=$$(lsof -ti :8086 2>/dev/null); \
+	if [ -n "$$PID" ]; then \
+		echo "── Killing process on port 8086 (PID $$PID)"; \
+		kill $$PID 2>/dev/null || true; \
+	fi
 
-watch: ## Run Host with hot reload
-	dotnet watch --project $(HOST_PROJECT)
+LOG_DIR  := logs
+LOG_FILE := $(LOG_DIR)/dev.log
+
+# Usage: $(call tee_log,command)
+tee_log = mkdir -p $(LOG_DIR) && $(1) 2>&1 | tee -a $(LOG_FILE)
+
+run: stop .env ## Run Host locally (no Docker)
+	@echo "── SSH tunnel (run in WSL2 on Win11): ssh -N -L 8086:localhost:8086 freax@192.168.1.108"
+	@echo "── Logs: $(LOG_FILE)"
+	$(call tee_log,set -a && . ./.env && set +a && ASPNETCORE_ENVIRONMENT=Development dotnet run --project $(HOST_PROJECT) --urls http://localhost:8086)
+
+watch: stop .env ## Run Host with hot reload
+	@echo "── SSH tunnel (run in WSL2 on Win11): ssh -N -L 8086:localhost:8086 freax@192.168.1.108"
+	@echo "── Logs: $(LOG_FILE)"
+	$(call tee_log,set -a && . ./.env && set +a && ASPNETCORE_ENVIRONMENT=Development dotnet watch --non-interactive --project $(HOST_PROJECT) --urls http://localhost:8086)
 
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 test: ## Run all tests
-	dotnet test
+	$(call tee_log,dotnet test)
 
 test-unit: ## Run unit tests only
-	dotnet test tests/Download.UnitTests \
-	&& dotnet test tests/Discovery.UnitTests \
-	&& dotnet test tests/Radio.UnitTests \
-	&& dotnet test tests/Quota.UnitTests \
-	&& dotnet test tests/Identity.UnitTests \
-	&& dotnet test tests/Shared.UnitTests
+	$(call tee_log,dotnet test tests/Download.UnitTests && dotnet test tests/Discovery.UnitTests && dotnet test tests/Radio.UnitTests && dotnet test tests/Quota.UnitTests && dotnet test tests/Identity.UnitTests && dotnet test tests/Shared.UnitTests)
 
 test-integration: ## Run integration tests only
-	dotnet test tests/Download.IntegrationTests
+	$(call tee_log,dotnet test tests/Download.IntegrationTests)
 
 coverage: ## Run tests with code coverage
-	dotnet test --collect:"XPlat Code Coverage" --results-directory ./coverage
+	$(call tee_log,dotnet test --collect:"XPlat Code Coverage" --results-directory ./coverage)
 	@echo "Coverage reports in ./coverage/"
 
 # ── Docker ───────────────────────────────────────────────────────────────────
@@ -101,9 +114,7 @@ deploy-test: ## Build image and verify it starts + responds to health check
 # ── Database ─────────────────────────────────────────────────────────────────
 
 migrate: ## Run all EF Core migrations
-	dotnet ef database update --project src/Modules/Download/Infrastructure --startup-project $(STARTUP_PROJECT)
-	dotnet ef database update --project src/Modules/Identity/Infrastructure --startup-project $(STARTUP_PROJECT)
-	dotnet ef database update --project src/Modules/Quota/Infrastructure --startup-project $(STARTUP_PROJECT)
+	$(call tee_log,cd $(STARTUP_PROJECT) && dotnet ef database update --project ../Modules/Download/Infrastructure --context DownloadDbContext && dotnet ef database update --project ../Modules/Identity/Infrastructure --context IdentityDbContext && dotnet ef database update --project ../Modules/Quota/Infrastructure --context QuotaDbContext)
 
 migration-add: ## Add migration (NAME=xxx MODULE=Download|Identity|Quota)
 ifndef NAME
@@ -119,13 +130,13 @@ endif
 # ── Quality ──────────────────────────────────────────────────────────────────
 
 lint: ## Check code formatting
-	dotnet format --verify-no-changes
+	$(call tee_log,dotnet format --verify-no-changes)
 
 outdated: ## Check for outdated packages
-	dotnet list package --outdated
+	$(call tee_log,dotnet list package --outdated)
 
 vuln: ## Check for vulnerable packages
-	dotnet list package --vulnerable --include-transitive
+	$(call tee_log,dotnet list package --vulnerable --include-transitive)
 
 # ── Verification ────────────────────────────────────────────────────────
 
