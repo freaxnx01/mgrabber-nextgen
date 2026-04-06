@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.SignalR.Client;
 using MudBlazor;
@@ -19,6 +20,7 @@ public partial class PlaylistDownload : IAsyncDisposable
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
+    [Inject] private ILogger<PlaylistDownload> Logger { get; set; } = default!;
 
     private string _playlistUrl = string.Empty;
     private string _selectedFormat = "Mp3";
@@ -50,9 +52,9 @@ public partial class PlaylistDownload : IAsyncDisposable
             _selectedFormat = settings.DefaultFormat;
             _normalizeAudio = settings.EnableNormalization;
         }
-        catch
+        catch (Exception ex)
         {
-            // Use defaults on failure
+            Logger.LogWarning(ex, "Failed to load user settings for user {UserId}, using defaults", _userId);
         }
     }
 
@@ -62,9 +64,9 @@ public partial class PlaylistDownload : IAsyncDisposable
         {
             _quota = await QuotaService.GetQuotaAsync(_userId);
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-fatal
+            Logger.LogWarning(ex, "Failed to load quota for user {UserId}", _userId);
         }
     }
 
@@ -84,6 +86,7 @@ public partial class PlaylistDownload : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load playlist from URL {PlaylistUrl}", _playlistUrl);
             Snackbar.Add($"Failed to load playlist: {ex.Message}", Severity.Error);
         }
         finally
@@ -114,6 +117,7 @@ public partial class PlaylistDownload : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to start batch downloads for {Count} videos", _selectedVideos.Count);
             Snackbar.Add($"Failed to start downloads: {ex.Message}", Severity.Error);
         }
         finally
@@ -137,6 +141,7 @@ public partial class PlaylistDownload : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to start download for video {VideoId}", video.VideoId);
             Snackbar.Add($"Failed to start download: {ex.Message}", Severity.Error);
         }
     }
@@ -151,8 +156,9 @@ public partial class PlaylistDownload : IAsyncDisposable
                 .OrderByDescending(j => j.CreatedAt)
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(ex, "Failed to load active jobs for user {UserId}", _userId);
             _activeJobs = [];
         }
     }
@@ -193,9 +199,9 @@ public partial class PlaylistDownload : IAsyncDisposable
         {
             await _hubConnection.StartAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // Non-fatal
+            Logger.LogWarning(ex, "SignalR connection failed, real-time updates will be unavailable");
         }
     }
 

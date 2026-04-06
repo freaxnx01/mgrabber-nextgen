@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using MusicGrabber.Frontend.Services;
@@ -20,6 +21,7 @@ public partial class MusicBrainzSearch
     [Inject] private IDownloadFrontendService DownloadService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = null!;
+    [Inject] private ILogger<MusicBrainzSearch> Logger { get; set; } = default!;
 
     private string _searchQuery = string.Empty;
     private string _searchType = SearchTypeArtist;
@@ -69,6 +71,7 @@ public partial class MusicBrainzSearch
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "MusicBrainz search failed for query {Query} with type {SearchType}", _searchQuery, _searchType);
             Snackbar.Add($"Search failed: {ex.Message}", Severity.Error);
         }
         finally
@@ -96,6 +99,7 @@ public partial class MusicBrainzSearch
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "YouTube search failed for query {Query}", query);
             Snackbar.Add($"YouTube search failed: {ex.Message}", Severity.Error);
         }
         finally
@@ -117,6 +121,7 @@ public partial class MusicBrainzSearch
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to start download for video {VideoId}", result.VideoId);
             Snackbar.Add($"Failed to start download: {ex.Message}", Severity.Error);
         }
     }
@@ -134,6 +139,7 @@ public partial class MusicBrainzSearch
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to start download for video {VideoId} with format {Format}", args.Result.VideoId, args.Format);
             Snackbar.Add($"Failed to start download: {ex.Message}", Severity.Error);
         }
     }

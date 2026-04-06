@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using MusicGrabber.Frontend.Services;
@@ -16,6 +17,7 @@ public partial class Radio : IDisposable
     [Inject] private IDownloadFrontendService DownloadService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = null!;
+    [Inject] private ILogger<Radio> Logger { get; set; } = default!;
 
     private string _userId = string.Empty;
     private bool _isLoadingStations = true;
@@ -52,6 +54,7 @@ public partial class Radio : IDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load radio stations");
             Snackbar.Add($"Failed to load stations: {ex.Message}", Severity.Error);
         }
         finally
@@ -85,6 +88,7 @@ public partial class Radio : IDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load data for station {StationId}", _selectedStationId);
             Snackbar.Add($"Failed to load station data: {ex.Message}", Severity.Error);
         }
     }
@@ -137,6 +141,7 @@ public partial class Radio : IDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to extract song {Artist} - {Title}", song.Artist, song.Title);
             Snackbar.Add($"Extract failed: {ex.Message}", Severity.Error);
         }
     }
@@ -155,6 +160,7 @@ public partial class Radio : IDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "YouTube search failed for query {Query}", _youTubeQuery);
             Snackbar.Add($"YouTube search failed: {ex.Message}", Severity.Error);
         }
         finally
@@ -176,6 +182,7 @@ public partial class Radio : IDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to start download for video {VideoId}", result.VideoId);
             Snackbar.Add($"Download failed: {ex.Message}", Severity.Error);
         }
     }
@@ -193,6 +200,7 @@ public partial class Radio : IDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to start download for video {VideoId} with format {Format}", args.Result.VideoId, args.Format);
             Snackbar.Add($"Download failed: {ex.Message}", Severity.Error);
         }
     }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using MudBlazor;
 using MusicGrabber.Frontend.Services;
 using MusicGrabber.Shared.DTOs;
@@ -11,6 +12,7 @@ public partial class Statistics
 {
     [Inject] private IDownloadFrontendService DownloadService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
+    [Inject] private ILogger<Statistics> Logger { get; set; } = default!;
 
     private bool _isLoading = true;
     private bool _showUserDialog;
@@ -45,6 +47,7 @@ public partial class Statistics
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load global statistics");
             Snackbar.Add($"Failed to load statistics: {ex.Message}", Severity.Error);
         }
         finally

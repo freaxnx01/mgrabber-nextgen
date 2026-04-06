@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using MusicGrabber.Frontend.Services;
@@ -17,6 +18,7 @@ public partial class Profile
     [Inject] private IQuotaFrontendService QuotaService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = null!;
+    [Inject] private ILogger<Profile> Logger { get; set; } = default!;
 
     private string _userId = string.Empty;
     private bool _isSaving;
@@ -42,25 +44,25 @@ public partial class Profile
     private async Task LoadProfileAsync()
     {
         try { _profile = await IdentityService.GetProfileAsync(_userId); }
-        catch { /* Non-fatal */ }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load profile for user {UserId}", _userId); }
     }
 
     private async Task LoadSettingsAsync()
     {
         try { _settings = await IdentityService.GetOrCreateSettingsAsync(_userId); }
-        catch { /* Non-fatal */ }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load settings for user {UserId}", _userId); }
     }
 
     private async Task LoadQuotaAsync()
     {
         try { _quota = await QuotaService.GetQuotaAsync(_userId); }
-        catch { /* Non-fatal */ }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load quota for user {UserId}", _userId); }
     }
 
     private async Task LoadStatsAsync()
     {
         try { _stats = await DownloadService.GetUserStatsAsync(_userId); }
-        catch { /* Non-fatal */ }
+        catch (Exception ex) { Logger.LogWarning(ex, "Failed to load stats for user {UserId}", _userId); }
     }
 
     private async Task SaveSettingsAsync()
@@ -81,6 +83,7 @@ public partial class Profile
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to save settings for user {UserId}", _userId);
             Snackbar.Add($"Failed to save settings: {ex.Message}", Severity.Error);
         }
         finally

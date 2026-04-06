@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -20,6 +21,7 @@ public partial class Home : IAsyncDisposable
     [Inject] private IDialogService DialogService { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = null!;
     [Inject] private NavigationManager Navigation { get; set; } = null!;
+    [Inject] private ILogger<Home> Logger { get; set; } = default!;
 
     private string _searchQuery = string.Empty;
     private bool _isSearching;
@@ -55,9 +57,9 @@ public partial class Home : IAsyncDisposable
             var settings = await IdentityService.GetOrCreateSettingsAsync(_userId);
             _defaultFormat = settings.DefaultFormat;
         }
-        catch
+        catch (Exception ex)
         {
-            // Use default format on failure
+            Logger.LogWarning(ex, "Failed to load user settings for user {UserId}, using defaults", _userId);
         }
     }
 
@@ -71,8 +73,9 @@ public partial class Home : IAsyncDisposable
                 .OrderByDescending(j => j.CreatedAt)
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(ex, "Failed to load active jobs for user {UserId}", _userId);
             _activeJobs = [];
         }
     }
@@ -89,8 +92,9 @@ public partial class Home : IAsyncDisposable
                 .OrderByDescending(f => f.CompletedAt)
                 .ToList();
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogWarning(ex, "Failed to load user files for user {UserId}", _userId);
             _userFiles = [];
         }
         finally
@@ -135,9 +139,9 @@ public partial class Home : IAsyncDisposable
         {
             await _hubConnection.StartAsync();
         }
-        catch
+        catch (Exception ex)
         {
-            // SignalR connection failure is non-fatal
+            Logger.LogWarning(ex, "SignalR connection failed, real-time updates will be unavailable");
         }
     }
 
@@ -160,6 +164,7 @@ public partial class Home : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "YouTube search failed for query {Query}", _searchQuery);
             Snackbar.Add($"Search failed: {ex.Message}", Severity.Error);
         }
         finally
@@ -189,6 +194,7 @@ public partial class Home : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to start download for video {VideoId}", result.VideoId);
             Snackbar.Add($"Failed to start download: {ex.Message}", Severity.Error);
         }
     }
@@ -212,6 +218,7 @@ public partial class Home : IAsyncDisposable
             }
             catch (Exception ex)
             {
+                Logger.LogError(ex, "Failed to delete file for job {JobId}", file.JobId);
                 Snackbar.Add($"Failed to delete: {ex.Message}", Severity.Error);
             }
         }

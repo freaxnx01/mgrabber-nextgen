@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.Authorization;
 using MudBlazor;
 using MusicGrabber.Frontend.Services;
@@ -14,6 +15,7 @@ public partial class Whitelist
     [Inject] private IIdentityFrontendService IdentityService { get; set; } = null!;
     [Inject] private ISnackbar Snackbar { get; set; } = null!;
     [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = null!;
+    [Inject] private ILogger<Whitelist> Logger { get; set; } = default!;
 
     private string _userId = string.Empty;
     private string _searchFilter = string.Empty;
@@ -52,6 +54,7 @@ public partial class Whitelist
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to load whitelist");
             Snackbar.Add($"Failed to load whitelist: {ex.Message}", Severity.Error);
         }
         finally
@@ -83,6 +86,7 @@ public partial class Whitelist
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to add user {Email} to whitelist", _newEmail);
             Snackbar.Add($"Failed to add user: {ex.Message}", Severity.Error);
         }
     }
@@ -97,6 +101,7 @@ public partial class Whitelist
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to toggle whitelist status for entry {EntryId}", entry.Id);
             Snackbar.Add($"Failed to toggle status: {ex.Message}", Severity.Error);
         }
     }
@@ -123,6 +128,7 @@ public partial class Whitelist
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to remove whitelist entry {EntryId}", _entryToRemove?.Id);
             Snackbar.Add($"Failed to remove user: {ex.Message}", Severity.Error);
         }
     }
