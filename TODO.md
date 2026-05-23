@@ -1,3 +1,3 @@
 # TODO
 
-- [x] Fix `make watch`
+- [x] Fix `just watch`
