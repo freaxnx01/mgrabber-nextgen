@@ -25,13 +25,12 @@
 - [ ] `YOUTUBE_API_KEY` set
 - [ ] `GOOGLE_CLIENT_ID` set
 - [ ] `GOOGLE_CLIENT_SECRET` set
-- [ ] `API_KEY` set (secure random string)
 - [ ] `SMTP_PASSWORD` set (optional)
 
 ### 5. Traefik Setup
-- [ ] Traefik running with Docker
-- [ ] Traefik network created: `docker network create traefik`
-- [ ] Let's Encrypt configured in Traefik
+- [ ] Traefik running with Docker (file provider enabled)
+- [ ] [`traefik/mgrabber.yml`](../traefik/mgrabber.yml) copied into the Traefik dynamic config directory
+- [ ] Let's Encrypt `letsencrypt` cert resolver configured in Traefik's static config
 - [ ] Traefik dashboard accessible (optional)
 
 ## 🚀 Deployment Steps
@@ -62,11 +61,11 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 ### Step 3: Verify Deployment
 ```bash
-# Check containers
+# Check container
 docker ps
 
-# Check API health
-curl http://localhost:8085/api/health
+# Check health
+curl http://localhost:8086/health/live
 
 # Check Traefik routes
 docker logs traefik | grep mgrabber
@@ -127,10 +126,10 @@ docker logs traefik | grep mgrabber
 ### Issue: 502 Bad Gateway
 **Symptoms:** "Bad Gateway" error from Traefik
 **Solutions:**
-1. Check containers running: `docker ps`
-2. Check frontend logs: `docker-compose logs frontend`
-3. Verify Traefik network: `docker network inspect traefik`
-4. Restart: `docker-compose restart`
+1. Check container running: `docker ps`
+2. Check logs: `docker-compose logs musicgrabber`
+3. Verify the backend is reachable from the Traefik host: `curl http://192.168.1.124:8086/health/live`
+4. Restart: `docker-compose -f docker-compose.yml -f docker-compose.prod.yml restart`
 
 ## 📋 Final Status
 

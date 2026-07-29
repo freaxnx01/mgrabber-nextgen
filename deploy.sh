@@ -99,7 +99,7 @@ git pull origin main
 
 # Stop existing containers
 echo "Stopping existing containers..."
-docker-compose down
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
 
 # Build and start with production config
 echo "Building and starting services..."
@@ -113,13 +113,13 @@ echo ""
 echo -e "${YELLOW}Step 4: Health Check${NC}"
 echo "========================================"
 
-# Check API health
-API_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8085/api/health || echo "000")
+# Check health
+API_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8086/health/live || echo "000")
 if [ "$API_HEALTH" = "200" ]; then
-    echo -e "${GREEN}✓ API is healthy${NC}"
+    echo -e "${GREEN}✓ App is healthy${NC}"
 else
-    echo -e "${RED}✗ API health check failed (HTTP $API_HEALTH)${NC}"
-    echo "Check logs: docker-compose logs download-api"
+    echo -e "${RED}✗ Health check failed (HTTP $API_HEALTH)${NC}"
+    echo "Check logs: docker-compose logs musicgrabber"
 fi
 
 # Check if Traefik picked up the route
@@ -134,13 +134,13 @@ echo -e "${GREEN}  Deployment Complete!${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Access your application:"
-echo "  • Frontend: https://mgrabber.home.freaxnx01.ch"
-echo "  • API Health: http://192.168.1.124:8085/api/health"
+echo "  • App: https://mgrabber.home.freaxnx01.ch"
+echo "  • Health: http://192.168.1.124:8086/health/live"
 echo ""
 echo "Useful commands:"
 echo "  • View logs: docker-compose logs -f"
-echo "  • Restart: docker-compose restart"
-echo "  • Stop: docker-compose down"
+echo "  • Restart: docker-compose -f docker-compose.yml -f docker-compose.prod.yml restart"
+echo "  • Stop: docker-compose -f docker-compose.yml -f docker-compose.prod.yml down"
 echo ""
 echo -e "${YELLOW}Note: SSL certificate may take a few minutes to provision${NC}"
 echo ""
