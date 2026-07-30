@@ -6,8 +6,11 @@ http:
         - "websecure"
       tls:
         certResolver: "letsencrypt"
+        options: "mgrabber-tls@file"
+      middlewares:
+        - "mgrabber-hsts"
       service: "mgrabber"
-    
+
     mgrabber-http:
       rule: "Host(`mgrabber.home.freaxnx01.ch`)"
       entryPoints:
@@ -15,15 +18,37 @@ http:
       middlewares:
         - "https-redirect"
       service: "mgrabber"
-  
+
   services:
     mgrabber:
       loadBalancer:
         servers:
           - url: "http://192.168.1.124:8086"
-  
+
   middlewares:
     https-redirect:
       redirectScheme:
         scheme: https
         permanent: true
+
+    # Adds Strict-Transport-Security so browsers pin HTTPS after the first
+    # visit — required for an SSL Labs A+ rating.
+    mgrabber-hsts:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        forceSTSHeader: true
+
+tls:
+  # Modern, strong TLS baseline (TLS 1.2 minimum, no legacy ciphers) —
+  # required for an SSL Labs A+ rating.
+  options:
+    mgrabber-tls:
+      minVersion: "VersionTLS12"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+      curvePreferences:
+        - "X25519"
+        - "CurveP256"
