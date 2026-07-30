@@ -29,16 +29,6 @@ if ! command -v docker-compose &> /dev/null; then
     exit 1
 fi
 
-# Check Traefik network
-echo -e "${YELLOW}Checking Traefik network...${NC}"
-if ! docker network ls | grep -q "traefik"; then
-    echo -e "${YELLOW}Traefik network not found. Creating...${NC}"
-    docker network create traefik
-    echo -e "${GREEN}✓ Traefik network created${NC}"
-else
-    echo -e "${GREEN}✓ Traefik network exists${NC}"
-fi
-
 echo ""
 echo -e "${YELLOW}Step 1: Environment Configuration${NC}"
 echo "========================================"
